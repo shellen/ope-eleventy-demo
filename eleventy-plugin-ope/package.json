@@ -1,0 +1,24 @@
+{
+  "name": "eleventy-plugin-ope",
+  "version": "0.1.0",
+  "description": "Eleventy plugin that adds Open Portable Entitlement (OPE) support to any Eleventy blog — OPE global data, feed filters, and JWT grant helpers",
+  "main": "index.cjs",
+  "keywords": [
+    "eleventy",
+    "eleventy-plugin",
+    "ope",
+    "open-portable-entitlement",
+    "feeds",
+    "rss",
+    "entitlement",
+    "jwt"
+  ],
+  "author": "Jason Shellen",
+  "license": "MIT",
+  "peerDependencies": {
+    "@11ty/eleventy": ">=2.0.0"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.0"
+  }
+}
