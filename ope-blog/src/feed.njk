@@ -1,0 +1,38 @@
+---
+permalink: feed.json
+eleventyExcludeFromCollections: true
+---
+{%- set siteUrl = ope.siteUrl -%}
+{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "{{ ope.publisherName }}",
+  "home_page_url": "{{ siteUrl }}",
+  "feed_url": "{{ siteUrl }}/feed.json",
+  "items": [
+    {%- for post in collections.post | reverse %}
+    {
+      "id": "{{ post.data.ope_content_id | default(post.fileSlug) }}",
+      "url": "{{ siteUrl }}{{ post.url }}",
+      "title": "{{ post.data.title }}",
+      {%- if post.data.ope_gated %}
+      "content_text": {{ post.content | opePreview(280) | dump | safe }},
+      "extensions": {
+        "ope": {
+          "required": { "level": "{{ post.data.ope_level | default('subscriber') }}" },
+          "grants_allowed": {{ post.data.ope_grants | default(["subscription", "gift"]) | dump | safe }},
+          "content_id": "{{ post.data.ope_content_id | default(post.fileSlug) }}",
+          "content_metadata": {
+            "word_count": {{ post.content | opeWordCount }},
+            "estimated_read_time_minutes": {{ post.content | opeReadTime }},
+            "unlock_cta": "{{ post.data.ope_cta | default('Subscribe to read the full post') }}"
+          }
+        }
+      },
+      {%- else %}
+      "content_html": {{ post.content | dump | safe }},
+      {%- endif %}
+      "date_published": "{{ post.date.toISOString() }}"
+    }{{ "," if not loop.last }}
+    {%- endfor %}
+  ]
+}

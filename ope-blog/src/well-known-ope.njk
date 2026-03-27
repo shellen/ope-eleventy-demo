@@ -1,0 +1,24 @@
+---
+permalink: .well-known/ope
+eleventyExcludeFromCollections: true
+---
+{
+  "version": "0.1",
+  "entitlement": {
+    "grant_url": "{{ ope.siteUrl }}/api/entitlement/grant",
+    "refresh_url": "{{ ope.siteUrl }}/api/entitlement/refresh",
+    "revocation_url": "{{ ope.siteUrl }}/api/entitlement/revoke",
+    "token_format": "jwt",
+    "token_mode": "simple",
+    "default_ttl_seconds": {{ ope.defaultTtl }}
+  },
+  "content": {
+    "endpoint_template": "{{ ope.siteUrl }}/api/content/{id}",
+    "formats_available": ["html"]
+  },
+  "metadata": {
+    "subscribe_url": "{{ ope.subscribeUrl }}",
+    "plans": {{ ope.plans | dump | safe }}
+  },
+  "grants_supported": {{ ope.grantsSupported | dump | safe }}
+}

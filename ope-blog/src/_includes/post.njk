@@ -1,0 +1,19 @@
+---
+layout: base.njk
+---
+<article>
+  <h2>{{ title }}</h2>
+  <div class="meta">{{ page.date.toISOString().slice(0,10) }}{% if ope_gated %} <span class="tag gated">Subscribers only</span>{% endif %}</div>
+
+  {% if ope_gated %}
+    <div class="content">
+      <p>{{ content | opePreview(400) }}</p>
+    </div>
+    <div class="gated-notice">
+      <p style="margin-bottom: 0.75rem">{{ ope_cta | default("Subscribe to read the full post") }}</p>
+      <a href="/subscribe/" class="cta">Subscribe</a>
+    </div>
+  {% else %}
+    <div class="content">{{ content | safe }}</div>
+  {% endif %}
+</article>

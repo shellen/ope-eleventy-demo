@@ -1,0 +1,21 @@
+[build]
+  command = "npx @11ty/eleventy"
+  publish = "_site"
+  functions = "functions"
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["_site/api/content/_store.json"]
+
+# Route /api/content/* to the serverless function
+[[redirects]]
+  from = "/api/content/*"
+  to = "/.netlify/functions/content"
+  status = 200
+
+# Ensure .well-known files are served correctly
+[[headers]]
+  for = "/.well-known/*"
+  [headers.values]
+    Content-Type = "application/json"
+    Access-Control-Allow-Origin = "*"

@@ -1,0 +1,24 @@
+{
+  "name": "ope-blog",
+  "version": "0.1.0",
+  "description": "Minimal Eleventy blog with Open Portable Entitlement (OPE) support",
+  "scripts": {
+    "build": "npx @11ty/eleventy",
+    "dev": "npx @11ty/eleventy --serve",
+    "grant": "node scripts/create-grant.cjs"
+  },
+  "keywords": [
+    "ope",
+    "eleventy",
+    "feeds",
+    "entitlement",
+    "rss"
+  ],
+  "author": "Jason Shellen",
+  "license": "MIT",
+  "dependencies": {
+    "@11ty/eleventy": "^3.0.0",
+    "jsonwebtoken": "^9.0.0"
+  },
+  "type": "module"
+}
