@@ -4,14 +4,15 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 
 const SECRET = process.env.OPE_JWT_SECRET;
+const DISCOVERY_URL = process.env.OPE_SITE_URL
+  ? `${process.env.OPE_SITE_URL}/.well-known/ope`
+  : undefined;
 
 let contentStore = null;
 
 function loadStore() {
   if (contentStore) return contentStore;
   try {
-    // In Netlify functions, __dirname points to the function directory
-    // The content store is bundled via netlify.toml included_files
     const __dirname = dirname(fileURLToPath(import.meta.url));
     const paths = [
       join(__dirname, "../_site/api/content/_store.json"),
@@ -38,6 +39,13 @@ function verifyGrant(token) {
   }
 }
 
+// Spec §10.3: structured error responses
+function errorJSON(error, errorDescription, extra = {}) {
+  const body = { error, error_description: errorDescription, ...extra };
+  if (DISCOVERY_URL) body.ope_discovery = DISCOVERY_URL;
+  return JSON.stringify(body);
+}
+
 export async function handler(event) {
   const headers = {
     "Content-Type": "application/json",
@@ -51,7 +59,7 @@ export async function handler(event) {
   }
 
   if (event.httpMethod !== "GET") {
-    return { statusCode: 405, headers, body: JSON.stringify({ error: "Method not allowed" }) };
+    return { statusCode: 405, headers, body: errorJSON("invalid_request", "Method not allowed") };
   }
 
   // Extract content ID from path
@@ -59,7 +67,7 @@ export async function handler(event) {
   const contentId = segments[segments.length - 1];
 
   if (!contentId || contentId === "_store.json") {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: "Missing content ID" }) };
+    return { statusCode: 400, headers, body: errorJSON("invalid_request", "Missing content ID") };
   }
 
   // Validate grant token
@@ -67,26 +75,38 @@ export async function handler(event) {
   const match = authHeader.match(/^Bearer\s+(.+)$/i);
 
   if (!match) {
-    return { statusCode: 401, headers, body: JSON.stringify({ error: "Missing or invalid Authorization header" }) };
+    return {
+      statusCode: 401,
+      headers,
+      body: errorJSON("invalid_token", "Missing or invalid Authorization header", { content_id: contentId }),
+    };
   }
 
   const grant = verifyGrant(match[1]);
 
   if (!grant) {
-    return { statusCode: 401, headers, body: JSON.stringify({ error: "Invalid or expired grant token" }) };
+    return {
+      statusCode: 401,
+      headers,
+      body: errorJSON("invalid_token", "Invalid or expired grant token", { content_id: contentId }),
+    };
   }
 
   if (!grant.scope || !grant.scope.includes("content:read")) {
-    return { statusCode: 403, headers, body: JSON.stringify({ error: "Insufficient scope" }) };
+    return {
+      statusCode: 403,
+      headers,
+      body: errorJSON("not_entitled", "Insufficient scope — content:read required", { content_id: contentId }),
+    };
   }
 
-  // Per-item grants: check content_ids
+  // Per-item grants: check content_ids (spec §8.3)
   if (grant.grant_type === "per_item" && grant.content_ids) {
     if (!grant.content_ids.includes(contentId)) {
       return {
         statusCode: 403,
         headers,
-        body: JSON.stringify({ status: "not_entitled", reason: "per_item_required" }),
+        body: errorJSON("not_entitled", "Per-item grant does not include this content", { content_id: contentId }),
       };
     }
   }
@@ -96,7 +116,16 @@ export async function handler(event) {
   const content = store[contentId];
 
   if (!content) {
-    return { statusCode: 404, headers, body: JSON.stringify({ error: "Content not found", id: contentId }) };
+    return {
+      statusCode: 404,
+      headers,
+      body: errorJSON("not_found", "Content not found", { content_id: contentId }),
+    };
+  }
+
+  // Spec §10.1: include resource_type in response
+  if (!content.resource_type) {
+    content.resource_type = "article";
   }
 
   return { statusCode: 200, headers, body: JSON.stringify(content) };

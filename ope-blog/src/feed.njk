@@ -22,9 +22,14 @@ eleventyExcludeFromCollections: true
           "grants_allowed": {{ post.data.ope_grants | default(["subscription", "gift"]) | dump | safe }},
           "content_id": "{{ post.data.ope_content_id | default(post.fileSlug) }}",
           "content_metadata": {
+            "resource_type": "{{ post.data.ope_resource_type | default('article') }}",
             "word_count": {{ post.content | opeWordCount }},
             "estimated_read_time_minutes": {{ post.content | opeReadTime }},
-            "unlock_cta": "{{ post.data.ope_cta | default('Subscribe to read the full post') }}"
+            "unlock_cta": "{{ post.data.ope_cta | default('Subscribe to read the full post') }}",
+            "unlock_url": "{{ siteUrl }}{{ post.url }}?ope_unlock=1"{{ "," if post.data.ope_per_item_price }}
+            {%- if post.data.ope_per_item_price %}
+            "per_item_price": {{ post.data.ope_per_item_price | dump | safe }}
+            {%- endif %}
           }
         }
       },

@@ -1,0 +1,10 @@
+{
+  "name": "ope-reader",
+  "version": "0.1.0",
+  "description": "Minimal OPE reader demo — discovers feeds, acquires grants, fetches gated content",
+  "type": "module",
+  "scripts": {
+    "start": "node reader.js"
+  },
+  "dependencies": {}
+}
