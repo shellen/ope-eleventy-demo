@@ -20,6 +20,7 @@ ope-blog/                ← Publisher: Eleventy blog with OPE-enabled feeds + c
 ope-gateway/             ← Gateway:   Express server that issues/refreshes/revokes JWT grants
 ope-reader/              ← Reader:    Browser UI + CLI that walks the full OPE lifecycle
 eleventy-plugin-ope/     ← Plugin:    Reusable Eleventy plugin for adding OPE to any blog
+atproto-example/         ← AT Proto:  Vanilla JS demo — Bluesky identity as OPE publisherId
 ```
 
 ### How OPE works
@@ -233,7 +234,85 @@ Not yet implemented (future work):
 - §10.2: Batch content retrieval endpoint
 - §11: Web-based entitlement (HTTP 402, cookie transport, browser unlock)
 - §14: Entitlement brokers
-- §15: AT Protocol integration
+
+---
+
+## AT Protocol + OPE
+
+The `atproto-example/` directory demonstrates how AT Protocol identities work with OPE today. Open `atproto-example/index.html` in a browser — no build step, no dependencies, no server.
+
+### What it shows
+
+Enter any Bluesky handle and the demo fetches their profile, recent posts, and network-wide interaction counts. It shows how the user's `did:plc` identifier maps directly to an OPE `publisherId`.
+
+The demo uses two open APIs:
+
+| API | What it provides | Auth required |
+|-----|-----------------|---------------|
+| [Bluesky Public AppView](https://public.api.bsky.app) | Profile, posts | None |
+| [Constellation by Microcosm](https://constellation.microcosm.blue) | Network-wide interaction counts from the AT Protocol firehose | None |
+
+### Does Bluesky need to support OPE?
+
+**No.** OPE works *alongside* AT Protocol, not inside it. Here's why:
+
+The OPE entitlement flow — discovery, grant tokens, content access, refresh, revoke — happens between the **publisher**, **gateway**, and **reader**. Bluesky is not in that loop. What AT Protocol provides is an *identity layer*: every Bluesky user already has a decentralized identifier (`did:plc:...`) that is portable, cryptographically verifiable, and not locked to any single platform.
+
+A publisher who uses Bluesky can set their `did:plc` as their OPE `publisherId`. That's it. No changes to the gateway, no changes to the reader, no dependency on Bluesky adding OPE support. The identity is reused; the entitlement layer is independent.
+
+```
+┌──────────────┐     ┌───────────────┐     ┌───────────┐
+│  AT Protocol  │     │  OPE Layer    │     │  Content   │
+│  (identity)   │     │  (entitlement)│     │  (delivery)│
+│               │     │               │     │            │
+│  did:plc:...  │────►│  publisherId  │     │  /feed.json│
+│  @handle.bsky │     │  gateway JWT  │────►│  /api/...  │
+│               │     │  grant tokens │     │            │
+└──────────────┘     └───────────────┘     └───────────┘
+      ▲                                          ▲
+      │          no dependency between            │
+      └──────────────────────────────────────────┘
+```
+
+### Testing it yourself
+
+1. **Browse the demo**: Open `atproto-example/index.html` and enter a Bluesky handle. You'll see their `did:plc` and how it maps to an OPE publisher identity.
+
+2. **Run the full OPE flow with a Bluesky identity**: Use the existing OPE demo with a `did:plc` as the publisher ID:
+
+```bash
+# Start the OPE demo as usual
+./run-demo.sh
+
+# The publisher already uses a DID-style identifier (did:web:ope-demo.netlify.app)
+# A Bluesky publisher would use their did:plc instead — same protocol, different DID method
+```
+
+3. **Use Constellation to enrich your OPE feed**: Query interaction data from across the AT Protocol network at build time or client-side. Constellation indexes the entire firehose — likes, reposts, replies, follows — for any record or identity, not just Bluesky's own view.
+
+```javascript
+// Count likes on a post from anywhere in the atproto network
+const res = await fetch(
+  "https://constellation.microcosm.blue/xrpc/blue.microcosm.links.getBacklinksCount?" +
+  new URLSearchParams({
+    subject: "at://did:plc:.../app.bsky.feed.post/...",
+    source: "app.bsky.feed.like:subject.uri",
+  })
+);
+const { count } = await res.json();
+```
+
+### What would change for a production AT Protocol publisher
+
+For a real publisher using Bluesky as their identity:
+
+- **`eleventy.config.js`**: Change `publisherId` from `did:web:...` to their `did:plc:...`
+- **`/.well-known/ope`**: Discovery document advertises the `did:plc` publisher ID
+- **Gateway**: No changes. It issues JWT grant tokens with `sub` set to the subscriber, not the publisher
+- **Reader**: No changes. It reads the `publisherId` from the discovery document regardless of DID method
+- **Feed**: No changes. The JSON Feed with OPE extensions works exactly the same
+
+The only thing that changes is a config value.
 
 ---
 
