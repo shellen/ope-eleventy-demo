@@ -321,16 +321,18 @@
         if (!el) continue;
 
         try {
-          const target = encodeURIComponent(post.uri);
+          const subject = encodeURIComponent(post.uri);
+          // Use the current XRPC endpoint (blue.microcosm.links.getBacklinksCount)
+          // source format: "collection:path" (no leading dot on path)
           const [likes, reposts, replies] = await Promise.all([
-            fetchJson(`${CONSTELLATION}/links/count/distinct-dids?target=${target}&collection=app.bsky.feed.like&path=${encodeURIComponent(".subject.uri")}`),
-            fetchJson(`${CONSTELLATION}/links/count/distinct-dids?target=${target}&collection=app.bsky.feed.repost&path=${encodeURIComponent(".subject.uri")}`),
-            fetchJson(`${CONSTELLATION}/links/count/distinct-dids?target=${target}&collection=app.bsky.feed.post&path=${encodeURIComponent(".reply.parent.uri")}`),
+            fetchJson(`${CONSTELLATION}/xrpc/blue.microcosm.links.getBacklinksCount?subject=${subject}&source=${encodeURIComponent("app.bsky.feed.like:subject.uri")}`),
+            fetchJson(`${CONSTELLATION}/xrpc/blue.microcosm.links.getBacklinksCount?subject=${subject}&source=${encodeURIComponent("app.bsky.feed.repost:subject.uri")}`),
+            fetchJson(`${CONSTELLATION}/xrpc/blue.microcosm.links.getBacklinksCount?subject=${subject}&source=${encodeURIComponent("app.bsky.feed.post:reply.parent.uri")}`),
           ]);
 
-          const cLikes = likes?.total ?? 0;
-          const cReposts = reposts?.total ?? 0;
-          const cReplies = replies?.total ?? 0;
+          const cLikes = likes?.count ?? 0;
+          const cReposts = reposts?.count ?? 0;
+          const cReplies = replies?.count ?? 0;
 
           // Only show if there's a difference or data exists
           if (cLikes || cReposts || cReplies) {
