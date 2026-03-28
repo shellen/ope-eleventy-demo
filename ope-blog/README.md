@@ -1,6 +1,6 @@
 # OPE Demo Blog
 
-The smallest working implementation of [Open Portable Entitlement](https://feedspec.org) — an Eleventy blog with OPE-enabled feeds, a serverless content API, and JWT grant tokens.
+The smallest working implementation of [Open Portable Entitlement](https://feedspec.org): an Eleventy blog with OPE-enabled feeds, a serverless content API, and JWT grant tokens.
 
 ## What this is
 
@@ -73,7 +73,7 @@ ope_grants:
 ---
 ```
 
-The plugin handles the rest — preview extraction, feed metadata, content store entry.
+The plugin handles the rest: preview extraction, feed metadata, content store entry.
 
 ## What an OPE-compatible reader sees
 
@@ -101,7 +101,7 @@ When a reader like Pull Read fetches `/feed.json`, gated items look like this:
 
 The reader detects the `ope` extension, fetches `/.well-known/ope` for discovery, authenticates the user, obtains a grant token, and uses it to fetch full content from `/api/content/protocol-economics`.
 
-Readers without OPE support simply show the preview text and link to the post — graceful degradation.
+Readers without OPE support simply show the preview text and link to the post, graceful degradation.
 
 ## Grant token types
 
@@ -121,11 +121,11 @@ OPE_JWT_SECRET=s node scripts/create-grant.js --user dave --type gift --ttl 8640
 
 ## What this doesn't do (yet)
 
-- **OAuth flow** — grants are created via CLI/webhook, not a full OAuth dance
-- **Refresh tokens** — tokens expire and that's it; no refresh endpoint
-- **Batch endpoint** — single-item retrieval only
-- **Broker support** — no intermediary aggregation
-- **Stripe integration** — subscribe buttons are placeholders
+- **OAuth flow**: grants are created via CLI/webhook, not a full OAuth dance
+- **Refresh tokens**: tokens expire and that's it; no refresh endpoint
+- **Batch endpoint**: single-item retrieval only
+- **Broker support**: no intermediary aggregation
+- **Stripe integration**: subscribe buttons are placeholders
 
 These are all additive. The core OPE flow (discovery → grant → content) works end to end.
 

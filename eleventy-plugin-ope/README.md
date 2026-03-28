@@ -4,9 +4,9 @@ An Eleventy plugin that adds [Open Portable Entitlement (OPE)](https://feedspec.
 
 Drop it into a new or existing Eleventy site to get:
 
-- **Global `ope` data** — `siteUrl`, `publisherName`, `plans`, `grantsSupported`, `brokerSupport`, etc. available in all templates
-- **Feed filters** — `opePreview`, `opeWordCount`, `opeReadTime`, `jsonEscape` for building OPE-extended feeds
-- **JWT helpers** — `createGrant` and `verifyGrant` for your serverless content API, supporting all 14 grant types
+- **Global `ope` data**: `siteUrl`, `publisherName`, `plans`, `grantsSupported`, `brokerSupport`, etc. available in all templates
+- **Feed filters**: `opePreview`, `opeWordCount`, `opeReadTime`, `jsonEscape` for building OPE-extended feeds
+- **JWT helpers**: `createGrant` and `verifyGrant` for your serverless content API, supporting all 14 grant types
 
 ## Install
 

@@ -4,12 +4,12 @@ A minimal **OPE reader** demo with both a **browser UI** and a **CLI**. Aligned 
 
 Both interfaces walk through the full OPE lifecycle:
 
-1. **Discover** — fetches `/.well-known/ope` from the publisher (spec Section 6)
-2. **Browse** — fetches the JSON Feed, lists free and gated items with `content_metadata` (spec Section 9)
-3. **Subscribe** — requests a grant token + refresh token from the gateway (spec Section 8)
-4. **Read** — uses the grant to fetch full content from the publisher (spec Section 10)
-5. **Refresh** — refreshes the grant with token rotation (spec Section 12.3)
-6. **Revoke** — revokes the grant with a reason code (spec Section 12.2)
+1. **Discover**: fetches `/.well-known/ope` from the publisher (spec Section 6)
+2. **Browse**: fetches the JSON Feed, lists free and gated items with `content_metadata` (spec Section 9)
+3. **Subscribe**: requests a grant token + refresh token from the gateway (spec Section 8)
+4. **Read**: uses the grant to fetch full content from the publisher (spec Section 10)
+5. **Refresh**: refreshes the grant with token rotation (spec Section 12.3)
+6. **Revoke**: revokes the grant with a reason code (spec Section 12.2)
 
 ## Easiest: use the top-level launcher
 
@@ -37,7 +37,7 @@ You can change the **User ID** and **Grant type** in the UI to experiment with d
 
 ## CLI
 
-The CLI prints the same flow to the terminal — no dependencies required (Node 18+):
+The CLI prints the same flow to the terminal, no dependencies required (Node 18+):
 
 ```bash
 cd ope-reader

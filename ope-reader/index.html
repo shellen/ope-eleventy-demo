@@ -136,7 +136,7 @@
 <header>
   <h1>OPE Reader Demo</h1>
   <span class="badge">SPEC v0.1</span>
-  <p>Walk through the full Open Portable Entitlement lifecycle — discover, browse, subscribe, read, refresh, revoke.</p>
+  <p>Walk through the full Open Portable Entitlement lifecycle: discover, browse, subscribe, read, refresh, revoke.</p>
 </header>
 
 <div class="container">
@@ -398,7 +398,7 @@ async function runDemo() {
     document.getElementById(`step${stepNum}Body`).innerHTML =
       `<div class="req-res"><label>Error</label><pre style="color:var(--red)">${esc(detail)}</pre></div>
        <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--red)">Make sure the publisher (port 8080) and gateway (port 4000) are running.</p>`;
-    setStatus("Error — see the failed step above.");
+    setStatus("Error: see the failed step above.");
   }
 
   document.getElementById("runBtn").disabled = false;

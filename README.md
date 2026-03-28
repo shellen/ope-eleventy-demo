@@ -1,16 +1,16 @@
 # OPE Demo Suite
 
-Working implementations of every layer in the [Open Portable Entitlement (OPE)](https://feedspec.org) architecture — publisher, gateway, and reader — so you can see the full protocol in action with running code.
+Working implementations of every layer in the [Open Portable Entitlement (OPE)](https://feedspec.org) architecture: publisher, gateway, and reader. See the full protocol in action with running code.
 
 Aligned with **OPE spec v0.1** (March 2026).
 
 ## Why this exists
 
-Specifications are necessary but not sufficient. You can read the OPE spec and understand what discovery endpoints, grant tokens, and content retrieval are supposed to do — but the distance between reading a spec and believing it works is the distance between a diagram and running code. This project exists to close that gap.
+Specifications are necessary but not sufficient. You can read the OPE spec and understand what discovery endpoints, grant tokens, and content retrieval are supposed to do, but the distance between reading a spec and believing it works is the distance between a diagram and running code. This project exists to close that gap.
 
-When we designed OPE, we made a bet that entitlement could be cleanly separated from payment processing and content distribution. That's an easy claim to make in a specification document. It's a harder claim to prove. So we built the simplest possible versions of all three roles in the protocol — a publisher that serves an Eleventy blog with OPE-enabled feeds, a gateway that issues and manages JWT grant tokens, and a reader that walks through the entire lifecycle from discovery to revocation. You can run all three on your laptop in one command and watch the tokens flow between them.
+When we designed OPE, we made a bet that entitlement could be cleanly separated from payment processing and content distribution. That's an easy claim to make in a specification document. It's a harder claim to prove. So we built the simplest possible versions of all three roles in the protocol: a publisher that serves an Eleventy blog with OPE-enabled feeds, a gateway that issues and manages JWT grant tokens, and a reader that walks through the entire lifecycle from discovery to revocation. You can run all three on your laptop in one command and watch the tokens flow between them.
 
-We deliberately kept each component small enough to read in one sitting. The gateway is a single Express server file. The reader is a single script with zero dependencies. The blog is a standard Eleventy site with a handful of templates. If you want to understand how OPE works, you shouldn't need to deploy infrastructure or study a framework — you should be able to read the code, run the demo, and start building.
+We deliberately kept each component small enough to read in one sitting. The gateway is a single Express server file. The reader is a single script with zero dependencies. The blog is a standard Eleventy site with a handful of templates. If you want to understand how OPE works, you shouldn't need to deploy infrastructure or study a framework. You should be able to read the code, run the demo, and start building.
 
 ## What's in this repo
 
@@ -24,7 +24,7 @@ eleventy-plugin-ope/     ← Plugin:    Reusable Eleventy plugin for adding OPE 
 
 ### How OPE works
 
-OPE separates four concerns: content, distribution, entitlement, and payments (spec Section 3). This repo demonstrates the first three. Payments are explicitly out of scope — OPE proves access, it doesn't move money.
+OPE separates four concerns: content, distribution, entitlement, and payments (spec Section 3). This repo demonstrates the first three. Payments are explicitly out of scope. OPE proves access, it doesn't move money.
 
 ```
 ┌──────────┐       ┌──────────┐       ┌──────────┐
@@ -60,11 +60,11 @@ This installs all dependencies and starts three services:
 
 | Service | Port | What it is |
 |---------|------|-----------|
-| **Reader UI** | [localhost:3000](http://localhost:3000) | Browser-based OPE demo — click "Run Full Demo" to walk through every step |
+| **Reader UI** | [localhost:3000](http://localhost:3000) | Browser-based OPE demo. Click "Run Full Demo" to walk through every step |
 | **Publisher** | [localhost:8080](http://localhost:8080) | Eleventy blog with OPE-enabled feeds and content API |
 | **Gateway** | [localhost:4000](http://localhost:4000) | Express server issuing/refreshing/revoking JWT grants |
 
-Open **http://localhost:3000** in your browser and click the button. The UI walks through each OPE step visually — discovery, feed parsing, grant acquisition, content fetch, token refresh, and revocation — showing the actual HTTP requests and responses.
+Open **http://localhost:3000** in your browser and click the button. The UI walks through each OPE step visually: discovery, feed parsing, grant acquisition, content fetch, token refresh, and revocation. It shows the actual HTTP requests and responses.
 
 Press `Ctrl+C` to stop everything.
 
@@ -97,8 +97,8 @@ A complete Eleventy blog with:
 - **JSON Feed** (`/feed.json`) with OPE extension blocks including `resource_type`, `unlock_url`, and `per_item_price` (spec §9.1)
 - **Discovery endpoint** (`/.well-known/ope`) with `max_ttl_seconds`, `batch_endpoint`, `broker_support` (spec §6)
 - **Content API** (Netlify function at `/api/content/{id}`) with spec-aligned error responses (`error`, `error_description`, `ope_discovery`) (spec §10.3)
-- **Build-time content store** — gated post content compiled to JSON with `resource_type`
-- **Sample posts** — mix of free and gated content with OPE frontmatter
+- **Build-time content store**: gated post content compiled to JSON with `resource_type`
+- **Sample posts**: mix of free and gated content with OPE frontmatter
 
 Posts are gated with frontmatter:
 

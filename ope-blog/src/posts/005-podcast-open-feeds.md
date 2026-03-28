@@ -15,14 +15,14 @@ ope_per_item_price:
   amount: 200
 ---
 
-A preview of Episode 1: Jason Shellen talks about the past, present, and future of feed-based publishing — from the early days of RSS at Blogger to the emergence of portable entitlements.
+A preview of Episode 1: Jason Shellen talks about the past, present, and future of feed-based publishing, from the early days of RSS at Blogger to the emergence of portable entitlements.
 
 **In the full episode:**
 
-- Why RSS succeeded where many "open" standards failed — simplicity and publisher-first design
+- Why RSS succeeded where many "open" standards failed: simplicity and publisher-first design
 - How JSON Feed modernized syndication for a new generation of developers
 - The missing piece: entitlement verification that isn't locked to a single platform
-- What podcast players, feed readers, and video apps have in common — and why they should share an entitlement layer
+- What podcast players, feed readers, and video apps have in common, and why they should share an entitlement layer
 - The broker model: can we build a "cable bundle" that's actually good for creators?
 
 This is a premium episode. Subscribers get the full 57-minute ad-free version. Free listeners can hear a 2-minute preview clip via the feed enclosure. OPE-compatible podcast players will automatically unlock the full episode for authenticated subscribers.
