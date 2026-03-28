@@ -3,13 +3,21 @@ layout: base.njk
 ---
 <article>
   <h2>{{ title }}</h2>
-  <div class="meta">{{ page.date.toISOString().slice(0,10) }}{% if ope_gated %} <span class="tag gated">Subscribers only</span>{% endif %}</div>
+  <div class="meta">
+    {{ page.date.toISOString().slice(0,10) }}
+    {% if ope_resource_type and ope_resource_type != "article" %} <span class="tag">{{ ope_resource_type }}</span>{% endif %}
+    {% if ope_gated %} <span class="tag gated">Subscribers only</span>{% endif %}
+  </div>
 
   {% if ope_gated %}
     <div class="content">
       <p>{{ content | opePreview(400) }}</p>
     </div>
     <div class="gated-notice">
+      <div class="stats">
+        {{ content | opeWordCount }} words · {{ content | opeReadTime }} min read
+        {% if ope_per_item_price %} · ${{ (ope_per_item_price.amount / 100) | round(2) }} per article{% endif %}
+      </div>
       <p style="margin-bottom: 0.75rem">{{ ope_cta | default("Subscribe to read the full post") }}</p>
       <a href="/subscribe/" class="cta">Subscribe</a>
     </div>

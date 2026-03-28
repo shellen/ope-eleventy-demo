@@ -1,7 +1,7 @@
 {
   "name": "ope-gateway",
   "version": "0.1.0",
-  "description": "Sample OPE gateway — issues, refreshes, and revokes JWT grant tokens",
+  "description": "Sample OPE gateway that issues, refreshes, and revokes JWT grant tokens",
   "type": "module",
   "scripts": {
     "start": "node server.js",
