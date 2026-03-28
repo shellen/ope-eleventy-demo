@@ -25,14 +25,26 @@ for arg in "$@"; do
   esac
 done
 
-export OPE_JWT_SECRET="${OPE_JWT_SECRET:-dev-secret-change-me}"
+# Generate a secret if one isn't already set.
+# For the local demo this is fine. For production, generate once and
+# store it somewhere permanent (e.g. Netlify env vars, Railway secrets).
+if [ -z "$OPE_JWT_SECRET" ]; then
+  export OPE_JWT_SECRET=$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")
+  GENERATED_SECRET=true
+else
+  GENERATED_SECRET=false
+fi
 
 echo ""
 echo "  ┌─────────────────────────────────────────┐"
 echo "  │         OPE Demo Suite Launcher          │"
 echo "  └─────────────────────────────────────────┘"
 echo ""
-echo "  JWT Secret: ${OPE_JWT_SECRET}"
+if [ "$GENERATED_SECRET" = true ]; then
+  echo "  JWT Secret: (auto-generated for this session)"
+else
+  echo "  JWT Secret: (using OPE_JWT_SECRET from environment)"
+fi
 echo ""
 
 # ── Install dependencies ─────────────────────────────────────

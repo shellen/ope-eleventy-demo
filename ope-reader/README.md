@@ -61,8 +61,10 @@ npm install && npm start
 Make sure the publisher and gateway share the same `OPE_JWT_SECRET`:
 
 ```bash
-export OPE_JWT_SECRET=dev-secret-change-me
+export OPE_JWT_SECRET=$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")
 ```
+
+Or use `./run-demo.sh` from the repo root, which generates a secret and starts all three components automatically.
 
 ## CLI options
 

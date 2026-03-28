@@ -56,6 +56,8 @@ OPE separates four concerns: content, distribution, entitlement, and payments (s
 ./run-demo.sh
 ```
 
+The script auto-generates a JWT secret for the session so all three components can sign and verify tokens. (For production, you'd generate a secret once and set it as an environment variable. See [Deploying](#deploying) below.)
+
 This installs all dependencies and starts three services:
 
 | Service | Port | What it is |
@@ -70,10 +72,11 @@ Press `Ctrl+C` to stop everything.
 
 ### Manual setup (three terminals)
 
-If you prefer to run each component separately:
+If you prefer to run each component separately, first generate a shared secret:
 
 ```bash
-export OPE_JWT_SECRET=dev-secret-change-me
+# Generate a secret (or pick any random string for local dev)
+export OPE_JWT_SECRET=$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")
 
 # Terminal 1 — Publisher
 cd ope-blog && npm install && npm run dev
@@ -242,8 +245,10 @@ The blog deploys to Netlify with zero configuration. The `netlify.toml`, serverl
 
 1. Push the repo to GitHub
 2. In Netlify, add a new site from the repo (set base directory to `ope-blog`)
-3. Add the environment variable `OPE_JWT_SECRET` (any random string)
+3. Add the environment variable `OPE_JWT_SECRET` (generate one with `node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))"`)
 4. Deploy
+
+The JWT secret is a symmetric signing key. The publisher uses it to verify grant tokens, and the gateway uses it to sign them. Both sides need the same value. For the local demo, `run-demo.sh` generates one automatically. For production, generate it once, store it in your hosting platform's secrets, and share it between the publisher and gateway deployments.
 
 Once live, anyone can browse the blog, inspect the JSON Feed with OPE extensions, and fetch the `/.well-known/ope` discovery document. The content API validates grant tokens and returns full gated content. See [`ope-blog/README.md`](./ope-blog/README.md) for detailed deployment instructions.
 
