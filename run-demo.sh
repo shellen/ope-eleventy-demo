@@ -86,8 +86,10 @@ trap cleanup EXIT INT TERM
 echo "  Starting services..."
 echo ""
 
-# 1. Publisher (Eleventy dev server on port 8080)
-(cd "$ROOT/ope-blog" && npx @11ty/eleventy --serve --port=8080 --quiet 2>&1 | sed 's/^/  [publisher] /') &
+# 1. Publisher (build static site, then serve with Express on port 8080)
+echo "  Building publisher site..."
+(cd "$ROOT/ope-blog" && npx @11ty/eleventy --quiet 2>&1 | sed 's/^/  [publisher] /')
+(cd "$ROOT/ope-blog" && node server.js 2>&1 | sed 's/^/  [publisher] /') &
 PIDS+=($!)
 
 # 2. Gateway (Express on port 4000)

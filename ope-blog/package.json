@@ -4,7 +4,9 @@
   "description": "Minimal Eleventy blog with Open Portable Entitlement (OPE) support",
   "scripts": {
     "build": "npx @11ty/eleventy",
-    "dev": "npx @11ty/eleventy --serve",
+    "start": "node server.js",
+    "dev": "npx @11ty/eleventy && node server.js",
+    "test": "npx @11ty/eleventy --quiet && node --test test-server.js",
     "grant": "node scripts/create-grant.cjs"
   },
   "keywords": [
@@ -18,6 +20,7 @@
   "license": "MIT",
   "dependencies": {
     "@11ty/eleventy": "^3.0.0",
+    "express": "^5.2.1",
     "jsonwebtoken": "^9.0.0"
   },
   "type": "module"
