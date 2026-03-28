@@ -1,40 +1,168 @@
-# ope-eleventy-demo
+# OPE Demo Suite
 
-Eleventy tooling for [Open Portable Entitlement (OPE)](https://feedspec.org) — a plugin you can drop into any Eleventy blog, plus a full working demo blog you can clone and deploy.
+Working implementations of every layer in the [Open Portable Entitlement (OPE)](https://feedspec.org) architecture — publisher, gateway, and reader — so you can see the full protocol in action without reading spec prose.
 
 ## What's in this repo
 
 ```
-eleventy-plugin-ope/   ← the Eleventy plugin (use this with any blog)
-ope-blog/              ← full demo blog built on the plugin
-ope-blog.tar.gz        ← tarball of the demo blog for quick download
+ope-blog/                ← Publisher: Eleventy blog with OPE-enabled feeds + content API
+ope-gateway/             ← Gateway:   Express server that issues/refreshes/revokes JWT grants
+ope-reader/              ← Reader:    Zero-dep Node.js script that walks the full OPE lifecycle
+eleventy-plugin-ope/     ← Plugin:    Reusable Eleventy plugin for adding OPE to any blog
+```
+
+### How OPE works
+
+```
+┌──────────┐       ┌──────────┐       ┌──────────┐
+│  Reader   │──1──►│ Publisher │       │ Gateway  │
+│           │◄─2───│ (blog)   │       │          │
+│           │──3──►│          │       │          │
+│           │◄─4───│          │       │          │
+│           │──5─────────────────────►│          │
+│           │◄─6─────────────────────┤│          │
+│           │──7──►│          │       │          │
+│           │◄─8───│          │       │          │
+└──────────┘       └──────────┘       └──────────┘
+
+1. GET /.well-known/ope        → Discover publisher's OPE config
+2. ← Discovery document        (content endpoint, grants supported, plans)
+3. GET /feed.json              → Fetch JSON Feed with OPE extensions
+4. ← Feed with gated items     (previews, content IDs, metadata)
+5. POST /api/entitlement/grant → Request a grant token
+6. ← JWT grant token            (subscription, per_item, metered, gift)
+7. GET /api/content/{id}       → Fetch gated content with Bearer token
+8. ← Full content               (HTML, verified via JWT)
 ```
 
 ---
 
-## Option A — Add the plugin to an existing (or new) Eleventy blog
+## Quick start: run the full demo
 
-The plugin lives in [`eleventy-plugin-ope/`](./eleventy-plugin-ope). It has no Eleventy-specific build requirements; copy it or install it like any local package.
-
-### 1. Copy the plugin into your project
+You need three terminals. All components share the same JWT secret.
 
 ```bash
-# Inside your Eleventy project
-cp -r /path/to/ope-eleventy-demo/eleventy-plugin-ope ./plugins/eleventy-plugin-ope
+export OPE_JWT_SECRET=dev-secret-change-me
 ```
 
-Or, if this package is published to npm, install it directly:
+**Terminal 1 — Publisher** (Eleventy blog on port 8080)
 
 ```bash
-npm install eleventy-plugin-ope
+cd ope-blog
+npm install
+npm run dev
 ```
 
-### 2. Register the plugin
+**Terminal 2 — Gateway** (Express on port 4000)
+
+```bash
+cd ope-gateway
+npm install
+npm start
+```
+
+**Terminal 3 — Reader** (runs the full lifecycle and exits)
+
+```bash
+cd ope-reader
+node reader.js
+```
+
+The reader will discover the publisher, fetch the feed, acquire a grant from the gateway, fetch gated content, refresh the token, and then revoke it — printing every step.
+
+---
+
+## Publisher: ope-blog
+
+A complete Eleventy blog with:
+
+- **JSON Feed** (`/feed.json`) with OPE extension blocks on gated items
+- **Discovery endpoint** (`/.well-known/ope`) advertising content API, plans, and grant types
+- **Content API** (Netlify function at `/api/content/{id}`) that validates JWT grants and returns full HTML
+- **Build-time content store** — gated post content compiled to JSON at build time
+- **Sample posts** — mix of free and gated content with OPE frontmatter
+
+Posts are gated with frontmatter:
+
+```yaml
+---
+ope_gated: true
+ope_content_id: protocol-economics
+ope_level: subscriber
+ope_cta: "Subscribe for $5/month to read the full essay"
+ope_grants:
+  - subscription
+  - gift
+---
+```
+
+See [`ope-blog/README.md`](./ope-blog/README.md) for deployment details.
+
+---
+
+## Gateway: ope-gateway
+
+A sample Express server implementing the three OPE gateway endpoints:
+
+| Endpoint | Method | What it does |
+|----------|--------|-------------|
+| `/api/entitlement/grant` | POST | Issue a JWT grant token for a subscriber |
+| `/api/entitlement/refresh` | POST | Refresh an existing grant before expiry |
+| `/api/entitlement/revoke` | POST | Revoke a grant (e.g., on cancellation) |
+| `/.well-known/ope` | GET | Gateway discovery document |
+
+Try it with curl:
+
+```bash
+# Get a subscription grant
+curl -s http://localhost:4000/api/entitlement/grant \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "alice", "grant_type": "subscription"}' | jq
+
+# Use the token to fetch gated content from the publisher
+TOKEN=$(curl -s http://localhost:4000/api/entitlement/grant \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "alice", "grant_type": "subscription"}' | jq -r .token)
+
+curl -s http://localhost:8080/api/content/protocol-economics \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
+
+See [`ope-gateway/README.md`](./ope-gateway/README.md) for all options.
+
+---
+
+## Reader: ope-reader
+
+A zero-dependency Node.js script (requires Node 18+ for built-in `fetch`) that demonstrates the complete OPE lifecycle:
+
+1. **Discover** — `GET /.well-known/ope`
+2. **Browse** — `GET /feed.json`, list free vs. gated items
+3. **Subscribe** — `POST /api/entitlement/grant` to the gateway
+4. **Read** — `GET /api/content/{id}` with the JWT
+5. **Refresh** — `POST /api/entitlement/refresh`
+6. **Revoke** — `POST /api/entitlement/revoke`
+
+```bash
+node ope-reader/reader.js
+node ope-reader/reader.js --user alice --content protocol-economics
+```
+
+See [`ope-reader/README.md`](./ope-reader/README.md) for all options.
+
+---
+
+## Eleventy Plugin: eleventy-plugin-ope
+
+A reusable plugin you can drop into any Eleventy blog. Provides:
+
+- Global `ope` data object for templates
+- Filters: `opePreview`, `opeWordCount`, `opeReadTime`, `jsonEscape`
+- JWT helpers: `createGrant()`, `verifyGrant()`
 
 ```js
 // eleventy.config.js
 const opePlugin = require("./plugins/eleventy-plugin-ope");
-// or: const opePlugin = require("eleventy-plugin-ope");
 
 export default function (eleventyConfig) {
   eleventyConfig.addPlugin(opePlugin, {
@@ -42,78 +170,12 @@ export default function (eleventyConfig) {
     publisherName: "Your Blog",
     plans: [
       { id: "monthly", name: "Monthly", currency: "USD", amount: 500 },
-      { id: "annual",  name: "Annual",  currency: "USD", amount: 4000 },
     ],
-    grantsSupported: ["subscription", "gift", "per_item", "metered"],
   });
 }
 ```
 
-### 3. Add the OPE templates
-
-Copy these source files from [`ope-blog/src/`](./ope-blog/src) into your own `src/` (or wherever your Eleventy input lives):
-
-| file | what it does |
-|------|--------------|
-| `feed.njk` | JSON Feed with OPE extension blocks on gated items |
-| `well-known-ope.njk` | OPE discovery document at `/.well-known/ope` |
-| `content-store.11ty.js` | Build-time JSON store of full gated content |
-
-### 4. Add the content API (optional — for Netlify)
-
-Copy [`ope-blog/functions/content.js`](./ope-blog/functions/content.js) into your `functions/` directory and add the redirect in `netlify.toml`:
-
-```toml
-[build]
-  functions = "functions"
-
-[[redirects]]
-  from = "/api/content/*"
-  to   = "/.netlify/functions/content"
-  status = 200
-```
-
-Set your secret before deploying:
-
-```bash
-netlify env:set OPE_JWT_SECRET $(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
-```
-
-### 5. Gate a post
-
-Add OPE frontmatter to any markdown post:
-
-```yaml
----
-title: My Premium Post
-date: 2026-01-01
-ope_gated: true
-ope_content_id: my-premium-post
-ope_level: subscriber
-ope_cta: "Subscribe for $5/month to read the full post"
-ope_grants:
-  - subscription
-  - gift
----
-```
-
-See [`eleventy-plugin-ope/README.md`](./eleventy-plugin-ope/README.md) for the full plugin API.
-
----
-
-## Option B — Start from the full demo blog
-
-The [`ope-blog/`](./ope-blog) directory (also available as `ope-blog.tar.gz`) is a complete, deployable Eleventy blog. Clone or extract it, then follow the quick-start in [`ope-blog/README.md`](./ope-blog/README.md).
-
-```bash
-# Extract the tarball into a new directory
-mkdir my-ope-blog && tar -xzf ope-blog.tar.gz -C my-ope-blog --strip-components=1
-
-# Install and run
-cd my-ope-blog
-npm install
-npm run dev
-```
+See [`eleventy-plugin-ope/README.md`](./eleventy-plugin-ope/README.md) for the full API.
 
 ---
 
