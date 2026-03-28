@@ -4,6 +4,14 @@ Working implementations of every layer in the [Open Portable Entitlement (OPE)](
 
 Aligned with **OPE spec v0.1** (March 2026).
 
+## Why this exists
+
+Specifications are necessary but not sufficient. You can read the OPE spec and understand what discovery endpoints, grant tokens, and content retrieval are supposed to do — but the distance between reading a spec and believing it works is the distance between a diagram and running code. This project exists to close that gap.
+
+When we designed OPE, we made a bet that entitlement could be cleanly separated from payment processing and content distribution. That's an easy claim to make in a specification document. It's a harder claim to prove. So we built the simplest possible versions of all three roles in the protocol — a publisher that serves an Eleventy blog with OPE-enabled feeds, a gateway that issues and manages JWT grant tokens, and a reader that walks through the entire lifecycle from discovery to revocation. You can run all three on your laptop in one command and watch the tokens flow between them.
+
+We deliberately kept each component small enough to read in one sitting. The gateway is a single Express server file. The reader is a single script with zero dependencies. The blog is a standard Eleventy site with a handful of templates. If you want to understand how OPE works, you shouldn't need to deploy infrastructure or study a framework — you should be able to read the code, run the demo, and start building.
+
 ## What's in this repo
 
 ```
