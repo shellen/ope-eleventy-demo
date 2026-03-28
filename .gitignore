@@ -1,0 +1,7 @@
+node_modules/
+_site/
+test-results/
+*.tar.gz
+.env
+.env.*
+ope-eleventy-demo/
