@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AT Protocol + OPE Identity Demo</title>
+  <style>
+    :root {
+      --blue: #0085ff;
+      --gray-50: #f8fafc;
+      --gray-100: #f1f5f9;
+      --gray-200: #e2e8f0;
+      --gray-400: #94a3b8;
+      --gray-500: #64748b;
+      --gray-600: #475569;
+      --gray-700: #334155;
+      --gray-800: #1e293b;
+      --radius: 8px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: var(--gray-800); background: var(--gray-50); line-height: 1.6;
+    }
+    .container { max-width: 640px; margin: 0 auto; padding: 2rem 1rem; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* Search bar */
+    .search {
+      display: flex; gap: 0.5rem; margin-bottom: 2rem;
+    }
+    .search input {
+      flex: 1; padding: 0.6rem 0.8rem; border: 1px solid var(--gray-200);
+      border-radius: var(--radius); font-size: 1rem; background: white;
+    }
+    .search input:focus { outline: none; border-color: var(--blue); }
+    .search button {
+      padding: 0.6rem 1.2rem; background: var(--blue); color: white;
+      border: none; border-radius: var(--radius); font-size: 1rem; cursor: pointer;
+    }
+    .search button:hover { background: #0066cc; }
+    .search button:disabled { background: var(--gray-400); cursor: wait; }
+
+    /* Profile */
+    .profile { text-align: center; margin-bottom: 2rem; }
+    .profile-avatar {
+      width: 80px; height: 80px; border-radius: 50%;
+      border: 3px solid var(--gray-200);
+    }
+    .profile h1 { font-size: 1.5rem; margin: 0.5rem 0 0.25rem; }
+    .handle { color: var(--gray-500); font-size: 0.9rem; }
+    .bio { color: var(--gray-600); margin: 0.5rem 0; font-size: 0.95rem; white-space: pre-wrap; }
+    .profile-stats {
+      display: flex; justify-content: center; gap: 1.5rem;
+      font-size: 0.85rem; color: var(--gray-500); margin-top: 0.75rem;
+    }
+    .profile-stats strong { color: var(--gray-800); }
+
+    /* Identity card */
+    .identity-card {
+      background: var(--gray-100); border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 2rem;
+      font-size: 0.85rem;
+    }
+    .identity-card h3 {
+      font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--gray-500); margin-bottom: 0.5rem;
+    }
+    .identity-card code {
+      background: white; padding: 0.15em 0.4em; border-radius: 4px;
+      font-size: 0.8rem; border: 1px solid var(--gray-200); word-break: break-all;
+    }
+    .identity-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.25rem;
+    }
+    .identity-label { color: var(--gray-500); min-width: 120px; }
+
+    /* Posts */
+    .post {
+      background: white; border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.75rem;
+    }
+    .post-text { white-space: pre-wrap; margin-bottom: 0.75rem; }
+    .post-embed { margin-bottom: 0.75rem; }
+    .post-embed img { max-width: 100%; border-radius: 6px; }
+    .post-embed-link {
+      display: block; border: 1px solid var(--gray-200); border-radius: 6px;
+      padding: 0.75rem; color: var(--gray-700);
+    }
+    .embed-title { font-weight: 600; }
+    .embed-desc { font-size: 0.85rem; color: var(--gray-500); margin-top: 0.25rem; }
+
+    .post-meta {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 0.8rem; color: var(--gray-400); flex-wrap: wrap; gap: 0.25rem;
+    }
+    .post-stats { display: flex; gap: 1rem; }
+    .post-stats span { display: inline-flex; align-items: center; gap: 0.25rem; }
+
+    .counts-compare {
+      font-size: 0.75rem; color: var(--gray-500);
+      background: var(--gray-50); border-radius: 4px;
+      padding: 0.4rem 0.6rem; margin-top: 0.5rem;
+    }
+    .counts-compare .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .counts-compare .source { font-weight: 600; min-width: 100px; display: inline-block; }
+
+    .section-heading {
+      font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
+      color: var(--gray-400); margin: 1.5rem 0 0.75rem; padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .loading { text-align: center; color: var(--gray-400); padding: 2rem; }
+    .error { background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius); padding: 1rem; color: #991b1b; margin-bottom: 1rem; }
+
+    .info-box {
+      font-size: 0.9rem; color: var(--gray-600);
+      background: white; border: 1px solid var(--gray-200);
+      border-radius: var(--radius); padding: 1rem 1.25rem;
+    }
+    .info-box ul { margin: 0.75rem 0; padding-left: 1.25rem; }
+    .info-box code { background: var(--gray-100); padding: 0.1em 0.35em; border-radius: 3px; font-size: 0.85em; }
+
+    footer {
+      text-align: center; margin-top: 2rem; padding-top: 1rem;
+      border-top: 1px solid var(--gray-200);
+      font-size: 0.8rem; color: var(--gray-400);
+    }
+    footer a { color: var(--gray-500); }
+
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="search">
+      <input type="text" id="handle-input" placeholder="Enter a Bluesky handle (e.g. bsky.app)" value="bsky.app">
+      <button id="load-btn" onclick="loadProfile()">Load</button>
+    </div>
+
+    <div id="error" class="error hidden"></div>
+
+    <div id="profile-section" class="hidden">
+      <div class="profile">
+        <img class="profile-avatar" id="avatar" src="" alt="">
+        <h1 id="display-name"></h1>
+        <div class="handle" id="handle-display"></div>
+        <p class="bio" id="bio"></p>
+        <div class="profile-stats">
+          <span><strong id="followers">0</strong> followers</span>
+          <span><strong id="following">0</strong> following</span>
+          <span><strong id="post-count">0</strong> posts</span>
+        </div>
+      </div>
+
+      <div class="identity-card">
+        <h3>OPE Identity Bridge</h3>
+        <p style="margin-bottom: 0.5rem; color: var(--gray-600);">
+          This Bluesky identity can serve as an OPE <code>publisherId</code> &mdash;
+          no separate DID registration needed.
+        </p>
+        <div class="identity-row">
+          <span class="identity-label">DID:</span>
+          <code id="identity-did"></code>
+        </div>
+        <div class="identity-row">
+          <span class="identity-label">Method:</span>
+          <code id="identity-method"></code>
+        </div>
+        <div class="identity-row">
+          <span class="identity-label">Handle:</span>
+          <code id="identity-handle"></code>
+        </div>
+        <div class="identity-row">
+          <span class="identity-label">OPE Discovery:</span>
+          <code id="identity-discovery"></code>
+        </div>
+      </div>
+
+      <div class="section-heading">Recent Posts</div>
+      <div id="posts"></div>
+
+      <div class="section-heading">How This Works</div>
+      <div class="info-box">
+        <p><strong>This page uses two open APIs, entirely client-side:</strong></p>
+        <ul>
+          <li>
+            <strong>Bluesky Public API</strong> (<code>public.api.bsky.app</code>) &mdash;
+            profile and posts, no auth required
+          </li>
+          <li>
+            <strong>Constellation by Microcosm</strong> (<code>constellation.microcosm.blue</code>) &mdash;
+            network-wide interaction counts from the AT Protocol firehose
+          </li>
+        </ul>
+        <p style="margin-top: 0.5rem;">
+          The <code>did:plc</code> identity from AT Protocol maps directly to an
+          OPE <code>publisherId</code>. No new identity system needed &mdash;
+          any Bluesky user already has a decentralized identifier that works
+          with OPE's portable entitlement model.
+        </p>
+      </div>
+    </div>
+
+    <footer>
+      <p>
+        <a href="https://atproto.com">AT Protocol</a> &middot;
+        <a href="https://constellation.microcosm.blue">Constellation</a> &middot;
+        <a href="https://www.microcosm.blue">Microcosm</a> &middot;
+        <a href="../">OPE Demo</a>
+      </p>
+      <p>Zero dependencies &middot; Vanilla JS &middot; No build step</p>
+    </footer>
+  </div>
+
+  <script>
+    const BSKY_API = "https://public.api.bsky.app";
+    const CONSTELLATION = "https://constellation.microcosm.blue";
+
+    // Load on enter key
+    document.getElementById("handle-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") loadProfile();
+    });
+
+    // Load from URL hash on page load
+    if (location.hash) {
+      document.getElementById("handle-input").value = location.hash.slice(1);
+      loadProfile();
+    }
+
+    async function loadProfile() {
+      const handle = document.getElementById("handle-input").value.trim().replace(/^@/, "");
+      if (!handle) return;
+
+      const btn = document.getElementById("load-btn");
+      const errorEl = document.getElementById("error");
+      const profileSection = document.getElementById("profile-section");
+
+      btn.disabled = true;
+      btn.textContent = "Loading...";
+      errorEl.classList.add("hidden");
+      profileSection.classList.add("hidden");
+
+      location.hash = handle;
+
+      try {
+        // Fetch profile
+        const profile = await fetchJson(
+          `${BSKY_API}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(handle)}`
+        );
+
+        if (profile.error) throw new Error(profile.message || "Profile not found");
+
+        // Render profile
+        document.getElementById("avatar").src = profile.avatar || "";
+        document.getElementById("display-name").textContent = profile.displayName || profile.handle;
+        document.getElementById("handle-display").textContent = `@${profile.handle}`;
+        document.getElementById("bio").textContent = profile.description || "";
+        document.getElementById("followers").textContent = formatNum(profile.followersCount);
+        document.getElementById("following").textContent = formatNum(profile.followsCount);
+        document.getElementById("post-count").textContent = formatNum(profile.postsCount);
+
+        // Identity bridge
+        const didMethod = profile.did.startsWith("did:plc:") ? "did:plc" : "did:web";
+        document.getElementById("identity-did").textContent = profile.did;
+        document.getElementById("identity-method").textContent = didMethod;
+        document.getElementById("identity-handle").textContent = `@${profile.handle}`;
+        document.getElementById("identity-discovery").textContent =
+          `https://${profile.handle}/.well-known/ope`;
+
+        profileSection.classList.remove("hidden");
+
+        // Fetch posts
+        const feedData = await fetchJson(
+          `${BSKY_API}/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(handle)}&filter=posts_no_replies&limit=15`
+        );
+
+        renderPosts(feedData.feed || []);
+
+        // Fetch Constellation counts in parallel for all posts
+        enrichWithConstellation(feedData.feed || []);
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Load";
+      }
+    }
+
+    function renderPosts(feed) {
+      const container = document.getElementById("posts");
+      container.innerHTML = feed.map((item, i) => {
+        const post = item.post;
+        const url = bskyPostUrl(post.uri);
+        return `
+          <div class="post" id="post-${i}">
+            <div class="post-text">${escapeHtml(post.record?.text || "")}</div>
+            ${renderEmbed(post.embed)}
+            <div class="post-meta">
+              <a href="${url}" target="_blank">${relativeDate(post.record?.createdAt)}</a>
+              <div class="post-stats">
+                <span id="likes-${i}">${formatNum(post.likeCount)} likes</span>
+                <span>${formatNum(post.repostCount)} reposts</span>
+                <span>${formatNum(post.replyCount)} replies</span>
+              </div>
+            </div>
+            <div class="counts-compare hidden" id="constellation-${i}"></div>
+          </div>
+        `;
+      }).join("");
+    }
+
+    async function enrichWithConstellation(feed) {
+      for (let i = 0; i < feed.length; i++) {
+        const post = feed[i].post;
+        const el = document.getElementById(`constellation-${i}`);
+        if (!el) continue;
+
+        try {
+          const target = encodeURIComponent(post.uri);
+          const [likes, reposts, replies] = await Promise.all([
+            fetchJson(`${CONSTELLATION}/links/count/distinct-dids?target=${target}&collection=app.bsky.feed.like&path=${encodeURIComponent(".subject.uri")}`),
+            fetchJson(`${CONSTELLATION}/links/count/distinct-dids?target=${target}&collection=app.bsky.feed.repost&path=${encodeURIComponent(".subject.uri")}`),
+            fetchJson(`${CONSTELLATION}/links/count/distinct-dids?target=${target}&collection=app.bsky.feed.post&path=${encodeURIComponent(".reply.parent.uri")}`),
+          ]);
+
+          const cLikes = likes?.total ?? 0;
+          const cReposts = reposts?.total ?? 0;
+          const cReplies = replies?.total ?? 0;
+
+          // Only show if there's a difference or data exists
+          if (cLikes || cReposts || cReplies) {
+            el.innerHTML = `
+              <div class="row">
+                <span><span class="source">AppView:</span>
+                  ${post.likeCount} likes &middot; ${post.repostCount} reposts &middot; ${post.replyCount} replies</span>
+              </div>
+              <div class="row">
+                <span><span class="source">Constellation:</span>
+                  ${cLikes} likes &middot; ${cReposts} reposts &middot; ${cReplies} replies</span>
+              </div>
+            `;
+            el.classList.remove("hidden");
+          }
+        } catch (err) {
+          // Constellation is best-effort, fail silently
+        }
+      }
+    }
+
+    function renderEmbed(embed) {
+      if (!embed) return "";
+      if (embed.$type === "app.bsky.embed.images#view") {
+        return `<div class="post-embed">${embed.images.map((img) =>
+          `<img src="${img.thumb}" alt="${escapeHtml(img.alt || "")}" loading="lazy">`
+        ).join("")}</div>`;
+      }
+      if (embed.$type === "app.bsky.embed.external#view" && embed.external) {
+        const ext = embed.external;
+        return `<a class="post-embed post-embed-link" href="${escapeHtml(ext.uri)}" target="_blank">
+          <div class="embed-title">${escapeHtml(ext.title || "")}</div>
+          ${ext.description ? `<div class="embed-desc">${escapeHtml(ext.description)}</div>` : ""}
+        </a>`;
+      }
+      return "";
+    }
+
+    // ── Helpers ──
+
+    async function fetchJson(url) {
+      const res = await fetch(url, {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || `HTTP ${res.status}`);
+      }
+      return res.json();
+    }
+
+    function bskyPostUrl(uri) {
+      const m = uri?.match(/^at:\/\/(did:[^/]+)\/app\.bsky\.feed\.post\/(.+)$/);
+      return m ? `https://bsky.app/profile/${m[1]}/post/${m[2]}` : "#";
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement("div");
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    function formatNum(n) {
+      if (n == null) return "0";
+      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+      if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+      return String(n);
+    }
+
+    function relativeDate(dateStr) {
+      if (!dateStr) return "";
+      const diff = Date.now() - new Date(dateStr).getTime();
+      const mins = Math.floor(diff / 60000);
+      const hours = Math.floor(diff / 3600000);
+      const days = Math.floor(diff / 86400000);
+      if (mins < 60) return `${mins}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      if (days < 30) return `${days}d ago`;
+      return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+  </script>
+</body>
+</html>
