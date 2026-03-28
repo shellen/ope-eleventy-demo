@@ -234,6 +234,7 @@ Not yet implemented (future work):
 - §10.2: Batch content retrieval endpoint
 - §11: Web-based entitlement (HTTP 402, cookie transport, browser unlock)
 - §14: Entitlement brokers
+- One-click deploy: Convert gateway and reader to Netlify Functions so all three components deploy from a single button. The gateway endpoints are stateless and work as serverless functions; the reader proxy becomes Netlify redirects or edge functions.
 
 ---
 
