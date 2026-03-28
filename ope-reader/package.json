@@ -4,7 +4,10 @@
   "description": "Minimal OPE reader demo — discovers feeds, acquires grants, fetches gated content",
   "type": "module",
   "scripts": {
-    "start": "node reader.js"
+    "start": "node reader.js",
+    "web": "node web.js"
   },
-  "dependencies": {}
+  "dependencies": {
+    "express": "^4.21.0"
+  }
 }

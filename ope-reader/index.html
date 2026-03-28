@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OPE Reader Demo</title>
+<style>
+  :root {
+    --bg: #fafafa; --fg: #1a1a1a; --muted: #666; --border: #ddd;
+    --accent: #2563eb; --accent-light: #dbeafe;
+    --green: #16a34a; --green-light: #dcfce7;
+    --orange: #ea580c; --orange-light: #fff7ed;
+    --red: #dc2626; --red-light: #fef2f2;
+    --code-bg: #f3f4f6; --card-bg: #fff;
+    --radius: 8px; --font: system-ui, -apple-system, sans-serif;
+    --mono: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--fg); line-height: 1.6; }
+
+  header {
+    background: var(--fg); color: #fff; padding: 1.5rem 2rem;
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  }
+  header h1 { font-size: 1.25rem; font-weight: 600; }
+  header .badge {
+    background: var(--accent); color: #fff; font-size: 0.7rem;
+    padding: 0.2rem 0.5rem; border-radius: 3px; font-weight: 600;
+  }
+  header p { color: #999; font-size: 0.85rem; width: 100%; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
+
+  /* Steps */
+  .step {
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
+    margin-bottom: 1rem; overflow: hidden;
+  }
+  .step-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
+    background: var(--code-bg); cursor: default;
+  }
+  .step-num {
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700; flex-shrink: 0;
+    background: var(--border); color: var(--muted);
+  }
+  .step.active .step-num { background: var(--accent); color: #fff; }
+  .step.done .step-num { background: var(--green); color: #fff; }
+  .step.error .step-num { background: var(--red); color: #fff; }
+  .step-title { font-weight: 600; font-size: 0.95rem; flex: 1; }
+  .step-spec { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
+  .step-body { padding: 1rem; display: none; }
+  .step.active .step-body, .step.done .step-body, .step.error .step-body { display: block; }
+
+  /* Request/Response blocks */
+  .req-res { margin: 0.5rem 0; }
+  .req-res label {
+    display: block; font-size: 0.7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
+    margin-bottom: 0.25rem;
+  }
+  .req-res pre {
+    background: var(--code-bg); padding: 0.75rem; border-radius: 4px;
+    font-family: var(--mono); font-size: 0.8rem; overflow-x: auto;
+    white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto;
+  }
+
+  /* Feed items */
+  .feed-item {
+    border: 1px solid var(--border); border-radius: 4px;
+    padding: 0.75rem; margin: 0.5rem 0;
+  }
+  .feed-item.gated { border-left: 3px solid var(--orange); }
+  .feed-item.free { border-left: 3px solid var(--green); }
+  .feed-item h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
+  .feed-item .meta { font-size: 0.75rem; color: var(--muted); }
+  .feed-item .badge-gated {
+    background: var(--orange-light); color: var(--orange);
+    font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; font-weight: 600;
+  }
+  .feed-item .badge-free {
+    background: var(--green-light); color: var(--green);
+    font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; font-weight: 600;
+  }
+
+  /* Content display */
+  .content-display {
+    background: #fff; border: 1px solid var(--border); border-radius: 4px;
+    padding: 1rem; margin-top: 0.5rem;
+  }
+  .content-display h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
+  .content-display .article-body { font-size: 0.9rem; line-height: 1.7; }
+
+  /* Controls */
+  .controls { padding: 1.5rem 0; text-align: center; }
+  button {
+    background: var(--accent); color: #fff; border: none;
+    padding: 0.6rem 1.5rem; border-radius: var(--radius);
+    font-size: 0.9rem; font-weight: 600; cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.secondary {
+    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
+  }
+
+  .user-input {
+    display: flex; gap: 0.5rem; align-items: center; justify-content: center;
+    margin-bottom: 1rem; flex-wrap: wrap;
+  }
+  .user-input label { font-size: 0.85rem; font-weight: 600; }
+  .user-input input {
+    padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;
+    font-family: var(--mono); font-size: 0.85rem; width: 140px;
+  }
+
+  .status-bar {
+    text-align: center; padding: 0.5rem; font-size: 0.85rem;
+    color: var(--muted); font-style: italic;
+  }
+
+  /* Architecture diagram */
+  .arch {
+    font-family: var(--mono); font-size: 0.75rem; background: var(--code-bg);
+    padding: 1rem; border-radius: 4px; text-align: center; margin: 1rem 0;
+    line-height: 1.4; white-space: pre;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>OPE Reader Demo</h1>
+  <span class="badge">SPEC v0.1</span>
+  <p>Walk through the full Open Portable Entitlement lifecycle — discover, browse, subscribe, read, refresh, revoke.</p>
+</header>
+
+<div class="container">
+
+  <div class="arch">Publisher (:8080)          Gateway (:4000)          Reader (you)
+     [blog + feed]         [grant tokens]        [this browser]
+
+  Feed ──► Discovery ──► Auth ──► Grant Token ──► Content
+                                                      </div>
+
+  <div class="user-input">
+    <label>User ID:</label>
+    <input type="text" id="userId" value="demo-reader">
+    <label>Grant type:</label>
+    <input type="text" id="grantType" value="subscription">
+  </div>
+
+  <div class="controls">
+    <button id="runBtn" onclick="runDemo()">Run Full Demo</button>
+    <button id="resetBtn" class="secondary" onclick="resetDemo()" style="margin-left:0.5rem" disabled>Reset</button>
+  </div>
+
+  <div id="statusBar" class="status-bar">Click "Run Full Demo" to begin.</div>
+
+  <!-- Step 1: Discovery -->
+  <div class="step" id="step1">
+    <div class="step-header">
+      <div class="step-num">1</div>
+      <div class="step-title">Discover publisher capabilities</div>
+      <div class="step-spec">GET /.well-known/ope &middot; &sect;6</div>
+    </div>
+    <div class="step-body" id="step1Body"></div>
+  </div>
+
+  <!-- Step 2: Feed -->
+  <div class="step" id="step2">
+    <div class="step-header">
+      <div class="step-num">2</div>
+      <div class="step-title">Fetch JSON Feed &amp; list items</div>
+      <div class="step-spec">GET /feed.json &middot; &sect;9</div>
+    </div>
+    <div class="step-body" id="step2Body"></div>
+  </div>
+
+  <!-- Step 3: Grant -->
+  <div class="step" id="step3">
+    <div class="step-header">
+      <div class="step-num">3</div>
+      <div class="step-title">Acquire grant token from gateway</div>
+      <div class="step-spec">POST /api/entitlement/grant &middot; &sect;8</div>
+    </div>
+    <div class="step-body" id="step3Body"></div>
+  </div>
+
+  <!-- Step 4: Content -->
+  <div class="step" id="step4">
+    <div class="step-header">
+      <div class="step-num">4</div>
+      <div class="step-title">Fetch gated content with grant token</div>
+      <div class="step-spec">GET /api/content/{id} &middot; &sect;10</div>
+    </div>
+    <div class="step-body" id="step4Body"></div>
+  </div>
+
+  <!-- Step 5: Refresh -->
+  <div class="step" id="step5">
+    <div class="step-header">
+      <div class="step-num">5</div>
+      <div class="step-title">Refresh token (rotation)</div>
+      <div class="step-spec">POST /api/entitlement/refresh &middot; &sect;12.3</div>
+    </div>
+    <div class="step-body" id="step5Body"></div>
+  </div>
+
+  <!-- Step 6: Revoke -->
+  <div class="step" id="step6">
+    <div class="step-header">
+      <div class="step-num">6</div>
+      <div class="step-title">Revoke grant token</div>
+      <div class="step-spec">POST /api/entitlement/revoke &middot; &sect;12.2</div>
+    </div>
+    <div class="step-body" id="step6Body"></div>
+  </div>
+
+</div>
+
+<script>
+let state = {};
+
+function esc(s) {
+  const el = document.createElement("span");
+  el.textContent = s;
+  return el.innerHTML;
+}
+
+function reqRes(label, method, url, body, response) {
+  let html = `<div class="req-res"><label>${esc(label)}</label><pre>`;
+  html += `${method} ${esc(url)}\n`;
+  if (body) html += `\n${esc(JSON.stringify(body, null, 2))}`;
+  html += `</pre></div>`;
+  html += `<div class="req-res"><label>Response</label><pre>${esc(JSON.stringify(response, null, 2))}</pre></div>`;
+  return html;
+}
+
+function setStep(n, cls) {
+  document.getElementById(`step${n}`).className = `step ${cls}`;
+}
+
+function setStatus(msg) {
+  document.getElementById("statusBar").textContent = msg;
+}
+
+async function api(url, opts = {}) {
+  const res = await fetch(url, opts);
+  const data = await res.json();
+  if (!res.ok) throw { status: res.status, data };
+  return data;
+}
+
+async function runDemo() {
+  document.getElementById("runBtn").disabled = true;
+  document.getElementById("resetBtn").disabled = true;
+  const userId = document.getElementById("userId").value || "demo-reader";
+  const grantType = document.getElementById("grantType").value || "subscription";
+  state = {};
+
+  try {
+    // Step 1: Discovery
+    setStep(1, "active"); setStatus("Discovering publisher...");
+    const discovery = await api("/proxy/discovery");
+    state.discovery = discovery;
+    let html1 = reqRes("Request", "GET", "/.well-known/ope", null, discovery);
+    html1 += `<p style="margin-top:0.5rem;font-size:0.85rem">`;
+    html1 += `<strong>Token mode:</strong> ${esc(discovery.entitlement?.token_mode)} (${esc(discovery.entitlement?.token_format)})<br>`;
+    html1 += `<strong>Content endpoint:</strong> <code>${esc(discovery.content?.endpoint_template)}</code><br>`;
+    html1 += `<strong>Grants supported:</strong> ${esc((discovery.grants_supported || []).join(", "))}<br>`;
+    if (discovery.metadata?.plans?.length) {
+      html1 += `<strong>Plans:</strong> `;
+      html1 += discovery.metadata.plans.map(p => `${esc(p.name)} $${(p.amount/100).toFixed(2)}`).join(", ");
+    }
+    html1 += `</p>`;
+    document.getElementById("step1Body").innerHTML = html1;
+    setStep(1, "done");
+
+    // Step 2: Feed
+    setStep(2, "active"); setStatus("Fetching JSON Feed...");
+    const feed = await api("/proxy/feed");
+    state.feed = feed;
+    let html2 = reqRes("Request", "GET", "/feed.json", null, { title: feed.title, items: `[${feed.items.length} items]` });
+    html2 += `<div style="margin-top:0.5rem">`;
+    for (const item of feed.items) {
+      const gated = item.extensions?.ope != null;
+      const cls = gated ? "gated" : "free";
+      const badge = gated
+        ? `<span class="badge-gated">GATED</span>`
+        : `<span class="badge-free">FREE</span>`;
+      html2 += `<div class="feed-item ${cls}">`;
+      html2 += `<h4>${badge} ${esc(item.title)}</h4>`;
+      if (gated) {
+        const meta = item.extensions.ope.content_metadata || {};
+        const parts = [];
+        if (meta.resource_type) parts.push(meta.resource_type);
+        if (meta.word_count) parts.push(`${meta.word_count} words`);
+        if (meta.estimated_read_time_minutes) parts.push(`${meta.estimated_read_time_minutes} min`);
+        html2 += `<div class="meta">${esc(parts.join(" · "))}${meta.unlock_cta ? ` · ${esc(meta.unlock_cta)}` : ""}</div>`;
+        html2 += `<div class="meta">Content ID: <code>${esc(item.extensions.ope.content_id)}</code></div>`;
+      } else {
+        const preview = (item.content_html || "").replace(/<[^>]+>/g, "").substring(0, 120);
+        html2 += `<div class="meta">${esc(preview)}...</div>`;
+      }
+      html2 += `</div>`;
+    }
+    html2 += `</div>`;
+    document.getElementById("step2Body").innerHTML = html2;
+    setStep(2, "done");
+
+    // Pick first gated item
+    const gatedItems = feed.items.filter(i => i.extensions?.ope);
+    if (gatedItems.length === 0) {
+      setStatus("No gated items found in feed."); return;
+    }
+    const target = gatedItems[0];
+    const contentId = target.extensions.ope.content_id;
+
+    // Step 3: Grant
+    setStep(3, "active"); setStatus(`Requesting ${grantType} grant for "${userId}"...`);
+    const grantBody = { user_id: userId, grant_type: grantType };
+    const grant = await api("/proxy/grant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(grantBody),
+    });
+    state.grant = grant;
+    let html3 = reqRes("Request", "POST", "/api/entitlement/grant", grantBody, grant);
+    html3 += `<p style="margin-top:0.5rem;font-size:0.85rem">`;
+    html3 += `<strong>Grant type:</strong> ${esc(grant.grant_type)}<br>`;
+    html3 += `<strong>Scope:</strong> ${esc((grant.scope || []).join(", "))}<br>`;
+    html3 += `<strong>Expires in:</strong> ${grant.expires_in}s<br>`;
+    html3 += `<strong>Token ID:</strong> <code>${esc(grant.token_id)}</code><br>`;
+    html3 += `<strong>Refresh token:</strong> <code>${esc((grant.refresh_token || "").substring(0, 24))}...</code>`;
+    html3 += `</p>`;
+    document.getElementById("step3Body").innerHTML = html3;
+    setStep(3, "done");
+
+    // Step 4: Content
+    setStep(4, "active"); setStatus(`Fetching content: ${contentId}...`);
+    const content = await api(`/proxy/content/${encodeURIComponent(contentId)}`, {
+      headers: { Authorization: `Bearer ${grant.grant_token}` },
+    });
+    state.content = content;
+    let html4 = reqRes("Request", "GET", `/api/content/${contentId}`, null,
+      { id: content.id, title: content.title, resource_type: content.resource_type, content_html: "(full HTML)" });
+    html4 += `<div class="content-display">`;
+    html4 += `<h3>${esc(content.title)}</h3>`;
+    if (content.resource_type) html4 += `<div class="meta" style="margin-bottom:0.5rem;color:#666;font-size:0.8rem">${esc(content.resource_type)} · ${esc(content.published || "")}</div>`;
+    html4 += `<div class="article-body">${content.content_html || "<em>No HTML content</em>"}</div>`;
+    html4 += `</div>`;
+    document.getElementById("step4Body").innerHTML = html4;
+    setStep(4, "done");
+
+    // Step 5: Refresh
+    setStep(5, "active"); setStatus("Refreshing grant token (rotation)...");
+    const refreshBody = { refresh_token: grant.refresh_token };
+    const refreshed = await api("/proxy/refresh", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(refreshBody),
+    });
+    state.refreshed = refreshed;
+    let html5 = reqRes("Request", "POST", "/api/entitlement/refresh",
+      { refresh_token: `${(grant.refresh_token || "").substring(0, 20)}...` }, refreshed);
+    html5 += `<p style="margin-top:0.5rem;font-size:0.85rem">`;
+    html5 += `Old refresh token is now <strong>invalidated</strong> (rotation per spec &sect;12.3).<br>`;
+    html5 += `<strong>New token ID:</strong> <code>${esc(refreshed.token_id)}</code><br>`;
+    html5 += `<strong>New refresh token:</strong> <code>${esc((refreshed.refresh_token || "").substring(0, 24))}...</code>`;
+    html5 += `</p>`;
+    document.getElementById("step5Body").innerHTML = html5;
+    setStep(5, "done");
+
+    // Step 6: Revoke
+    setStep(6, "active"); setStatus("Revoking grant token...");
+    const revokeBody = { token: refreshed.grant_token, reason: "demo_complete" };
+    const revoked = await api("/proxy/revoke", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(revokeBody),
+    });
+    let html6 = reqRes("Request", "POST", "/api/entitlement/revoke",
+      { token: "(grant token)", reason: "demo_complete" }, revoked);
+    html6 += `<p style="margin-top:0.5rem;font-size:0.85rem">Grant token <strong>revoked</strong>. The token is cryptographically valid until expiry, but the gateway's revocation list will reject it on future use.</p>`;
+    document.getElementById("step6Body").innerHTML = html6;
+    setStep(6, "done");
+
+    setStatus("Complete! The full OPE lifecycle ran successfully.");
+  } catch (err) {
+    const stepNum = [1,2,3,4,5,6].find(n => document.getElementById(`step${n}`).classList.contains("active")) || 1;
+    setStep(stepNum, "error");
+    const detail = err.data ? JSON.stringify(err.data, null, 2) : err.message || String(err);
+    document.getElementById(`step${stepNum}Body`).innerHTML =
+      `<div class="req-res"><label>Error</label><pre style="color:var(--red)">${esc(detail)}</pre></div>
+       <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--red)">Make sure the publisher (port 8080) and gateway (port 4000) are running.</p>`;
+    setStatus("Error — see the failed step above.");
+  }
+
+  document.getElementById("runBtn").disabled = false;
+  document.getElementById("resetBtn").disabled = false;
+}
+
+function resetDemo() {
+  for (let i = 1; i <= 6; i++) {
+    document.getElementById(`step${i}`).className = "step";
+    document.getElementById(`step${i}Body`).innerHTML = "";
+  }
+  state = {};
+  setStatus('Click "Run Full Demo" to begin.');
+}
+</script>
+
+</body>
+</html>

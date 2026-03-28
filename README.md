@@ -7,9 +7,10 @@ Aligned with **OPE spec v0.1** (March 2026).
 ## What's in this repo
 
 ```
+run-demo.sh              ← One-command launcher — installs deps and starts everything
 ope-blog/                ← Publisher: Eleventy blog with OPE-enabled feeds + content API
 ope-gateway/             ← Gateway:   Express server that issues/refreshes/revokes JWT grants
-ope-reader/              ← Reader:    Zero-dep Node.js script that walks the full OPE lifecycle
+ope-reader/              ← Reader:    Browser UI + CLI that walks the full OPE lifecycle
 eleventy-plugin-ope/     ← Plugin:    Reusable Eleventy plugin for adding OPE to any blog
 ```
 
@@ -41,38 +42,43 @@ OPE separates four concerns: content, distribution, entitlement, and payments (s
 
 ---
 
-## Quick start: run the full demo
+## Quick start: one command
 
-You need three terminals. All components share the same JWT secret.
+```bash
+./run-demo.sh
+```
+
+This installs all dependencies and starts three services:
+
+| Service | Port | What it is |
+|---------|------|-----------|
+| **Reader UI** | [localhost:3000](http://localhost:3000) | Browser-based OPE demo — click "Run Full Demo" to walk through every step |
+| **Publisher** | [localhost:8080](http://localhost:8080) | Eleventy blog with OPE-enabled feeds and content API |
+| **Gateway** | [localhost:4000](http://localhost:4000) | Express server issuing/refreshing/revoking JWT grants |
+
+Open **http://localhost:3000** in your browser and click the button. The UI walks through each OPE step visually — discovery, feed parsing, grant acquisition, content fetch, token refresh, and revocation — showing the actual HTTP requests and responses.
+
+Press `Ctrl+C` to stop everything.
+
+### Manual setup (three terminals)
+
+If you prefer to run each component separately:
 
 ```bash
 export OPE_JWT_SECRET=dev-secret-change-me
+
+# Terminal 1 — Publisher
+cd ope-blog && npm install && npm run dev
+
+# Terminal 2 — Gateway
+cd ope-gateway && npm install && npm start
+
+# Terminal 3a — Reader CLI (prints to terminal)
+cd ope-reader && node reader.js
+
+# Terminal 3b — Reader Web UI (open http://localhost:3000)
+cd ope-reader && npm install && npm run web
 ```
-
-**Terminal 1 — Publisher** (Eleventy blog on port 8080)
-
-```bash
-cd ope-blog
-npm install
-npm run dev
-```
-
-**Terminal 2 — Gateway** (Express on port 4000)
-
-```bash
-cd ope-gateway
-npm install
-npm start
-```
-
-**Terminal 3 — Reader** (runs the full lifecycle and exits)
-
-```bash
-cd ope-reader
-node reader.js
-```
-
-The reader will discover the publisher, fetch the feed, acquire a grant from the gateway, fetch gated content, refresh the token (with rotation), and revoke it — printing every step with spec section references.
 
 ---
 
@@ -146,19 +152,22 @@ See [`ope-gateway/README.md`](./ope-gateway/README.md) for all options.
 
 ## Reader: ope-reader
 
-A zero-dependency Node.js script (requires Node 18+ for built-in `fetch`) that demonstrates the complete OPE lifecycle:
+Two ways to experience the OPE lifecycle:
 
-1. **Discover** — `GET /.well-known/ope` (§6)
-2. **Browse** — `GET /feed.json`, show `resource_type`, `unlock_cta`, `per_item_price` (§9)
-3. **Subscribe** — `POST /api/entitlement/grant` to the gateway (§8)
-4. **Read** — `GET /api/content/{id}` with the JWT, handle `media` objects (§10)
-5. **Refresh** — `POST /api/entitlement/refresh` with token rotation (§12.3)
-6. **Revoke** — `POST /api/entitlement/revoke` with reason code (§12.2)
+### Browser UI (`npm run web` or via `./run-demo.sh`)
+
+A single-page web app at **http://localhost:3000** that visually walks through each OPE step. Click "Run Full Demo" and watch each step expand with the actual HTTP requests, responses, and rendered content. You can change the user ID and grant type to experiment.
+
+### CLI (`node reader.js`)
+
+A zero-dependency script (Node 18+) that prints the same flow to the terminal:
 
 ```bash
 node ope-reader/reader.js
 node ope-reader/reader.js --user alice --content protocol-economics
 ```
+
+Both demonstrate the same 6 steps: Discover (§6) → Browse feed (§9) → Acquire grant (§8) → Fetch content (§10) → Refresh with rotation (§12.3) → Revoke (§12.2).
 
 See [`ope-reader/README.md`](./ope-reader/README.md) for all options.
 
