@@ -1,6 +1,6 @@
 # OPE Demo Blog
 
-The smallest working OPE publisher: an Eleventy blog with OPE-enabled feeds, a serverless content API, and JWT grant tokens. Aligned with [OPE spec v0.1](https://feedspec.org/ope).
+The smallest working OPE publisher: an Eleventy blog with OPE-enabled feeds, a JWT-gated content API, and grant tokens. Aligned with [OPE spec v0.1](https://feedspec.org/ope). Works locally with a built-in Express server and deploys to Netlify with a serverless function.
 
 ## What this is
 
@@ -8,7 +8,7 @@ A static blog that demonstrates OPE's publisher role:
 
 1. **Free posts** appear in full in the feed and on the site
 2. **Gated posts** show a preview in the feed with OPE extension metadata (`content_id`, `resource_type`, `word_count`, `unlock_cta`, `per_item_price`, etc.)
-3. A **serverless function** serves full content to readers that present a valid JWT grant token
+3. A **content API** serves full content to readers that present a valid JWT grant token (Express server locally, Netlify function in production)
 4. A **discovery endpoint** at `/.well-known/ope` tells readers how to authenticate and retrieve content
 
 ## Live demo
@@ -27,28 +27,33 @@ To test the full reader flow (discover, subscribe, read, refresh, revoke), clone
 src/posts/*.md          > Eleventy builds HTML + JSON Feed with OPE extensions
   |
 _site/feed.json         > JSON Feed with OPE extension blocks on gated items
-_site/.well-known/ope   > OPE discovery document (spec Section 6)
+_site/.well-known/ope/  > OPE discovery document (spec Section 6)
 _site/api/content/      > _store.json (full content of gated posts, build-time)
   |
-functions/content.js    > Netlify function validates JWT, returns full content
+server.js               > Local Express server: static files + content API with JWT validation
+functions/content.js    > Netlify serverless function: same content API for production
 ```
 
 The Eleventy plugin (`plugins/eleventy-plugin-ope/`) handles everything at build time: generating the discovery endpoint, adding OPE metadata to feeds, splitting gated content into preview (public) and full (behind the API).
 
-The content API is a single serverless function that reads the build-time content store and validates JWT grant tokens. No database, no OAuth server, no token management service.
+The content API reads the build-time content store and validates JWT grant tokens. No database, no OAuth server, no token management service. Locally, `server.js` serves both static files and the API. On Netlify, `functions/content.js` handles the API while the CDN serves static files.
 
 ## Quick start (local)
 
 ```bash
 npm install
+
+# Build the static site and start the Express server on port 8080
 npm run dev
 
 # In another terminal, create a test grant token
-OPE_JWT_SECRET=devtest node scripts/create-grant.cjs
+OPE_JWT_SECRET=dev-secret-change-me node scripts/create-grant.cjs
 
 # Test the content API (use the token from above)
-curl -H "Authorization: Bearer <token>" http://localhost:8888/api/content/protocol-economics
+curl -H "Authorization: Bearer <token>" http://localhost:8080/api/content/protocol-economics
 ```
+
+Or run `npm test` to build the site and run the test suite (10 tests covering static serving, JWT validation, scope checking, and per-item grants).
 
 ## Deploy to Netlify
 

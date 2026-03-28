@@ -79,7 +79,7 @@ If you prefer to run each component separately, first generate a shared secret:
 # Generate a secret (or pick any random string for local dev)
 export OPE_JWT_SECRET=$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")
 
-# Terminal 1 — Publisher
+# Terminal 1 — Publisher (build static site, then serve with Express)
 cd ope-blog && npm install && npm run dev
 
 # Terminal 2 — Gateway
@@ -100,7 +100,7 @@ A complete Eleventy blog with:
 
 - **JSON Feed** (`/feed.json`) with OPE extension blocks including `resource_type`, `unlock_url`, and `per_item_price` (spec §9.1)
 - **Discovery endpoint** (`/.well-known/ope`) with `max_ttl_seconds`, `batch_endpoint`, `broker_support` (spec §6)
-- **Content API** (Netlify function at `/api/content/{id}`) with spec-aligned error responses (`error`, `error_description`, `ope_discovery`) (spec §10.3)
+- **Content API** (`/api/content/{id}`) with spec-aligned error responses (`error`, `error_description`, `ope_discovery`) (spec §10.3). Served locally by an Express server (`server.js`), on Netlify by a serverless function (`functions/content.js`)
 - **Build-time content store**: gated post content compiled to JSON with `resource_type`
 - **Sample posts**: mix of free and gated content with OPE frontmatter
 
