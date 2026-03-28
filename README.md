@@ -239,56 +239,15 @@ Not yet implemented (future work):
 
 ## AT Protocol + OPE
 
-The `atproto-example/` directory demonstrates how AT Protocol identities work with OPE today. Open `atproto-example/index.html` in a browser — no build step, no dependencies, no server.
+OPE and AT Protocol integrate at two levels: what works today with no protocol changes, and what becomes possible when AT Protocol ships permission spaces. This repo demonstrates the first; the [OPE spec §15](https://feedspec.org/ope) defines the second.
 
-### What it shows
+### What works today (this demo)
 
-Enter any Bluesky handle and the demo fetches their profile, recent posts, and network-wide interaction counts. It shows how the user's `did:plc` identifier maps directly to an OPE `publisherId`.
+Open `atproto-example/index.html` in a browser — no build step, no dependencies, no server. Enter any Bluesky handle to see it in action.
 
-The demo uses two open APIs:
+**1. Identity bridge.** Every Bluesky user has a `did:plc` — a decentralized identifier that is portable, cryptographically verifiable, and not locked to any platform. OPE uses this directly as the `publisherId`. A publisher who uses Bluesky already has everything they need to issue OPE grant tokens. No new identity registration, no changes to the gateway or reader — just set `publisherId` to your `did:plc` instead of `did:web`.
 
-| API | What it provides | Auth required |
-|-----|-----------------|---------------|
-| [Bluesky Public AppView](https://public.api.bsky.app) | Profile, posts | None |
-| [Constellation by Microcosm](https://constellation.microcosm.blue) | Network-wide interaction counts from the AT Protocol firehose | None |
-
-### Does Bluesky need to support OPE?
-
-**No.** OPE works *alongside* AT Protocol, not inside it. Here's why:
-
-The OPE entitlement flow — discovery, grant tokens, content access, refresh, revoke — happens between the **publisher**, **gateway**, and **reader**. Bluesky is not in that loop. What AT Protocol provides is an *identity layer*: every Bluesky user already has a decentralized identifier (`did:plc:...`) that is portable, cryptographically verifiable, and not locked to any single platform.
-
-A publisher who uses Bluesky can set their `did:plc` as their OPE `publisherId`. That's it. No changes to the gateway, no changes to the reader, no dependency on Bluesky adding OPE support. The identity is reused; the entitlement layer is independent.
-
-```
-┌──────────────┐     ┌───────────────┐     ┌───────────┐
-│  AT Protocol  │     │  OPE Layer    │     │  Content   │
-│  (identity)   │     │  (entitlement)│     │  (delivery)│
-│               │     │               │     │            │
-│  did:plc:...  │────►│  publisherId  │     │  /feed.json│
-│  @handle.bsky │     │  gateway JWT  │────►│  /api/...  │
-│               │     │  grant tokens │     │            │
-└──────────────┘     └───────────────┘     └───────────┘
-      ▲                                          ▲
-      │          no dependency between            │
-      └──────────────────────────────────────────┘
-```
-
-### Testing it yourself
-
-1. **Browse the demo**: Open `atproto-example/index.html` and enter a Bluesky handle. You'll see their `did:plc` and how it maps to an OPE publisher identity.
-
-2. **Run the full OPE flow with a Bluesky identity**: Use the existing OPE demo with a `did:plc` as the publisher ID:
-
-```bash
-# Start the OPE demo as usual
-./run-demo.sh
-
-# The publisher already uses a DID-style identifier (did:web:ope-demo.netlify.app)
-# A Bluesky publisher would use their did:plc instead — same protocol, different DID method
-```
-
-3. **Use Constellation to enrich your OPE feed**: Query interaction data from across the AT Protocol network at build time or client-side. Constellation indexes the entire firehose — likes, reposts, replies, follows — for any record or identity, not just Bluesky's own view.
+**2. Social engagement via Constellation.** [Constellation](https://constellation.microcosm.blue) by [Microcosm](https://www.microcosm.blue/) indexes the entire AT Protocol firehose — every like, repost, reply, and follow across the network, not just Bluesky's own view. The demo queries it client-side to show interaction counts on posts. Publishers can use this at build time (via `eleventy-fetch`) or client-side to enrich OPE feeds with real engagement data.
 
 ```javascript
 // Count likes on a post from anywhere in the atproto network
@@ -302,43 +261,51 @@ const res = await fetch(
 const { count } = await res.json();
 ```
 
-### What would change for a production AT Protocol publisher
+**3. Content stays on your server.** Bluesky posts are public teasers. Full gated content lives on your own infrastructure, behind the OPE content API with JWT validation — exactly like the `ope-blog` demo. Bluesky is the distribution channel; OPE is the entitlement layer.
 
-For a real publisher using Bluesky as their identity:
+| What you get today | How |
+|--------------------|-----|
+| Bluesky DID as OPE publisher identity | Change one config value (`publisherId`) |
+| Network-wide engagement data | Constellation API, no auth required |
+| Gated content with OPE grant tokens | Existing OPE flow, no changes needed |
+| Post teasers on Bluesky with unlock links | Standard Bluesky posts linking to `unlock_url` |
 
-- **`eleventy.config.js`**: Change `publisherId` from `did:web:...` to their `did:plc:...`
-- **`/.well-known/ope`**: Discovery document advertises the `did:plc` publisher ID
-- **Gateway**: No changes. It issues JWT grant tokens with `sub` set to the subscriber, not the publisher
-- **Reader**: No changes. It reads the `publisherId` from the discovery document regardless of DID method
-- **Feed**: No changes. The JSON Feed with OPE extensions works exactly the same
+The demo uses two open APIs, both unauthenticated:
 
-The only thing that changes is a config value.
+| API | What it provides |
+|-----|-----------------|
+| [Bluesky Public AppView](https://public.api.bsky.app) | Profile, posts |
+| [Constellation by Microcosm](https://constellation.microcosm.blue) | Network-wide interaction counts from the AT Protocol firehose |
 
-### What if AT Protocol supported gated content natively?
+### What becomes possible with AT Protocol permission spaces (future)
 
-The OPE spec (§15) already defines this. AT Protocol is developing **permission spaces** — protocol-level access control for records. When that ships, OPE becomes the entitlement layer that governs who gets added to a permission space.
+AT Protocol is developing **permission spaces** — protocol-level access control for records. This is the atproto team's [major focus through summer 2026](https://atproto.com/blog/2026-spring-roadmap). When it ships, content gating moves from the application layer into the protocol itself, and OPE becomes the entitlement layer that governs who gets access.
 
-Here's how it works (from [OPE spec §15.2](https://feedspec.org/ope)):
+The [OPE spec §15](https://feedspec.org/ope) already defines this integration in detail.
+
+**How content gating changes:**
 
 ```
-Today (OPE alongside atproto)          Future (OPE over atproto)
-──────────────────────────────          ─────────────────────────
+Today (what this demo shows)            Future (with permission spaces)
+────────────────────────────            ───────────────────────────────
 Bluesky post = public teaser            Bluesky post = public teaser
 Full content = on your server           Full content = in a permission space (ats://)
 OPE grant → HTTP content API            OPE grant → DID added to space member list
-                                        ATProto enforces access at protocol level
+Any reader must visit your site         Any atproto reader can display gated content
 ```
 
-The integration flow:
+**The key difference:** Today, a reader has to leave their feed app and visit the publisher's website to access gated content. With permission spaces, gated content lives *in the AT Protocol network* — any OPE-compatible reader app can display it inline, the way Bluesky shows public posts today. The content is in the publisher's repository but only visible to entitled DIDs.
+
+**How it works (spec §15.2):**
 
 1. User obtains an OPE grant token (subscription, gift, trial, broker, etc.)
 2. Publisher's app validates the grant and **adds the user's DID to the permission space member list** with `read` access
 3. AT Protocol's space credential system handles protocol-level record access — the content is in the repo but only visible to entitled DIDs
 4. When the OPE grant expires or is revoked, the publisher's app **removes the DID** from the member list
 
-Space credentials are short-lived (2-4 hour expiration), stateless, and asymmetrically signed — complementing OPE's own short-lived grant tokens.
+Space credentials are short-lived (2-4 hour expiration), stateless, and asymmetrically signed — complementing OPE's own short-lived grant tokens. The PDS enforces access control; data is not encrypted at rest.
 
-The spec defines three Lexicons under the `org.feedspec.ope.*` namespace:
+**OPE Lexicons for AT Protocol.** The spec defines three Lexicons under the `org.feedspec.ope.*` namespace:
 
 | Lexicon | Type | Purpose |
 |---------|------|---------|
@@ -346,9 +313,26 @@ The spec defines three Lexicons under the `org.feedspec.ope.*` namespace:
 | `org.feedspec.ope.content.get` | Query | Retrieve single gated content item by ID |
 | `org.feedspec.ope.content.getBatch` | Query | Retrieve up to 50 gated content items |
 
-Permissioned content uses `ats://` URIs (not `at://`) with six components: space owner DID, space type NSID, space key, user DID, collection NSID, and record key. OPE's `content_id` maps to the space key or individual record keys.
+Permissioned content uses `ats://` URIs (not `at://`) with six components: space owner DID, space type NSID, space key, user DID, collection NSID, and record key. The space type NSID (`org.feedspec.ope.content`) serves as the OAuth consent boundary. Paid content spaces are configured as "default deny" — only the publisher's reader app and explicitly approved OPE-compatible readers are on the allowlist.
 
-**The bottom line:** Content isn't "on Bluesky but hidden." It's in a permissioned space that AT Protocol enforces at the protocol level — OPE governs *who gets access and why*. This demo shows what works today (identity + Constellation). The protocol-level integration is ready in the spec, waiting for AT Protocol permission spaces to ship.
+### What stays the same in both models
+
+OPE's core design doesn't change. In both models:
+
+- The **gateway** issues grant tokens. It doesn't know or care about AT Protocol.
+- The **feed** includes OPE extension blocks with previews, `content_id`, and `grants_allowed`.
+- The **grant token** carries the same claims: `grant_type`, `scope`, `exp`, `content_ids`.
+- The **14 grant types** all work: subscription, gift, trial, per-item, institutional, metered, broker, etc.
+
+What changes is *where the content lives* and *how access is enforced*. Today that's your HTTP server with JWT validation. Tomorrow it's AT Protocol's permission space with DID-based member lists. OPE governs *who gets access and why* in both cases.
+
+### Try it yourself
+
+1. **Browse the demo**: Open `atproto-example/index.html` and enter a Bluesky handle. You'll see their `did:plc` and how it maps to an OPE publisher identity.
+
+2. **Run the full OPE flow**: Start the demo with `./run-demo.sh` and walk through all six steps. The publisher already uses a DID-style identifier (`did:web:ope-demo.netlify.app`). A Bluesky publisher would use their `did:plc` instead — same protocol, different DID method.
+
+3. **Query Constellation**: Use the Constellation API to pull engagement data for any AT Protocol record. The demo does this client-side; for a static site, use `eleventy-fetch` to cache it at build time.
 
 ---
 
