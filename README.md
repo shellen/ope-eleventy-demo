@@ -314,6 +314,42 @@ For a real publisher using Bluesky as their identity:
 
 The only thing that changes is a config value.
 
+### What if AT Protocol supported gated content natively?
+
+The OPE spec (§15) already defines this. AT Protocol is developing **permission spaces** — protocol-level access control for records. When that ships, OPE becomes the entitlement layer that governs who gets added to a permission space.
+
+Here's how it works (from [OPE spec §15.2](https://feedspec.org/ope)):
+
+```
+Today (OPE alongside atproto)          Future (OPE over atproto)
+──────────────────────────────          ─────────────────────────
+Bluesky post = public teaser            Bluesky post = public teaser
+Full content = on your server           Full content = in a permission space (ats://)
+OPE grant → HTTP content API            OPE grant → DID added to space member list
+                                        ATProto enforces access at protocol level
+```
+
+The integration flow:
+
+1. User obtains an OPE grant token (subscription, gift, trial, broker, etc.)
+2. Publisher's app validates the grant and **adds the user's DID to the permission space member list** with `read` access
+3. AT Protocol's space credential system handles protocol-level record access — the content is in the repo but only visible to entitled DIDs
+4. When the OPE grant expires or is revoked, the publisher's app **removes the DID** from the member list
+
+Space credentials are short-lived (2-4 hour expiration), stateless, and asymmetrically signed — complementing OPE's own short-lived grant tokens.
+
+The spec defines three Lexicons under the `org.feedspec.ope.*` namespace:
+
+| Lexicon | Type | Purpose |
+|---------|------|---------|
+| `org.feedspec.ope.entitlement.grant` | Record | Grant record with publisher DID, user DID, grant type, scope, expiry |
+| `org.feedspec.ope.content.get` | Query | Retrieve single gated content item by ID |
+| `org.feedspec.ope.content.getBatch` | Query | Retrieve up to 50 gated content items |
+
+Permissioned content uses `ats://` URIs (not `at://`) with six components: space owner DID, space type NSID, space key, user DID, collection NSID, and record key. OPE's `content_id` maps to the space key or individual record keys.
+
+**The bottom line:** Content isn't "on Bluesky but hidden." It's in a permissioned space that AT Protocol enforces at the protocol level — OPE governs *who gets access and why*. This demo shows what works today (identity + Constellation). The protocol-level integration is ready in the spec, waiting for AT Protocol permission spaces to ship.
+
 ---
 
 ## Deploying
