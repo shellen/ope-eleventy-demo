@@ -232,6 +232,50 @@ Not yet implemented (future work):
 - §14: Entitlement brokers
 - §15: AT Protocol integration
 
+---
+
+## Deploying
+
+### The blog (publisher)
+
+The blog deploys to Netlify with zero configuration. The `netlify.toml`, serverless content function, and CORS headers are already set up.
+
+1. Push the repo to GitHub
+2. In Netlify, add a new site from the repo (set base directory to `ope-blog`)
+3. Add the environment variable `OPE_JWT_SECRET` (any random string)
+4. Deploy
+
+Once live, anyone can browse the blog, inspect the JSON Feed with OPE extensions, and fetch the `/.well-known/ope` discovery document. The content API validates grant tokens and returns full gated content. See [`ope-blog/README.md`](./ope-blog/README.md) for detailed deployment instructions.
+
+### The gateway (future improvement)
+
+The gateway is a standard Express server. For a fully hosted demo where the reader UI works end-to-end against live URLs, you'd deploy the gateway to a platform that supports persistent Node.js processes:
+
+**Railway** (recommended for simplicity):
+```bash
+cd ope-gateway
+railway init
+railway variables set OPE_JWT_SECRET=<same secret as the blog>
+railway up
+```
+
+**Render:**
+1. Create a new Web Service from the repo
+2. Set root directory to `ope-gateway`, build command to `npm install`, start command to `node server.js`
+3. Add `OPE_JWT_SECRET` as an environment variable
+
+**Fly.io:**
+```bash
+cd ope-gateway
+fly launch --name ope-gateway
+fly secrets set OPE_JWT_SECRET=<same secret as the blog>
+fly deploy
+```
+
+After deploying, update the reader's `--gateway` flag (or the reader web UI's proxy config) to point at the live gateway URL. The blog and gateway must share the same `OPE_JWT_SECRET` so the publisher can verify tokens the gateway issues.
+
+For now, the recommended workflow is: deploy the blog to Netlify so people can see OPE in production, and run `./run-demo.sh` locally for the full three-component demo.
+
 ## Spec
 
 [Open Portable Entitlement specification v0.1](https://feedspec.org/ope)

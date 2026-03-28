@@ -1,43 +1,50 @@
 # OPE Demo Blog
 
-The smallest working implementation of [Open Portable Entitlement](https://feedspec.org): an Eleventy blog with OPE-enabled feeds, a serverless content API, and JWT grant tokens.
+The smallest working OPE publisher: an Eleventy blog with OPE-enabled feeds, a serverless content API, and JWT grant tokens. Aligned with [OPE spec v0.1](https://feedspec.org/ope).
 
 ## What this is
 
-A static blog that demonstrates OPE's core flow:
+A static blog that demonstrates OPE's publisher role:
 
 1. **Free posts** appear in full in the feed and on the site
-2. **Gated posts** show a preview in the feed with OPE extension metadata (`content_id`, `word_count`, `unlock_cta`, etc.)
-3. A **serverless function** serves full content to readers that present a valid OPE grant token
-4. A **discovery endpoint** at `/.well-known/ope` tells OPE-compatible readers how to authenticate and retrieve content
+2. **Gated posts** show a preview in the feed with OPE extension metadata (`content_id`, `resource_type`, `word_count`, `unlock_cta`, `per_item_price`, etc.)
+3. A **serverless function** serves full content to readers that present a valid JWT grant token
+4. A **discovery endpoint** at `/.well-known/ope` tells readers how to authenticate and retrieve content
+
+## Live demo
+
+The blog is deployed at **https://ope-demo.netlify.app** (or wherever you deploy it). Once live, you can inspect the OPE endpoints directly:
+
+- Blog: https://ope-demo.netlify.app
+- JSON Feed: https://ope-demo.netlify.app/feed.json
+- OPE Discovery: https://ope-demo.netlify.app/.well-known/ope
+
+To test the full reader flow (discover, subscribe, read, refresh, revoke), clone the repo and run `./run-demo.sh` from the root. The reader web UI at `http://localhost:3000` walks through every step visually.
 
 ## Architecture
 
 ```
-src/posts/*.md          → Eleventy builds HTML + JSON Feed with OPE extensions
-  ↓
-_site/feed.json         → JSON Feed with ope extension blocks on gated items
-_site/.well-known/ope   → OPE discovery document
-_site/api/content/      → _store.json (full content of gated posts, build-time)
-  ↓
-functions/content.js    → Netlify function validates JWT, returns full content
+src/posts/*.md          > Eleventy builds HTML + JSON Feed with OPE extensions
+  |
+_site/feed.json         > JSON Feed with OPE extension blocks on gated items
+_site/.well-known/ope   > OPE discovery document (spec Section 6)
+_site/api/content/      > _store.json (full content of gated posts, build-time)
+  |
+functions/content.js    > Netlify function validates JWT, returns full content
 ```
 
 The Eleventy plugin (`plugins/eleventy-plugin-ope/`) handles everything at build time: generating the discovery endpoint, adding OPE metadata to feeds, splitting gated content into preview (public) and full (behind the API).
 
 The content API is a single serverless function that reads the build-time content store and validates JWT grant tokens. No database, no OAuth server, no token management service.
 
-## Quick start
+## Quick start (local)
 
 ```bash
-# Install dependencies
 npm install
-
-# Run locally
 npm run dev
 
 # In another terminal, create a test grant token
-OPE_JWT_SECRET=devtest node scripts/create-grant.js
+OPE_JWT_SECRET=devtest node scripts/create-grant.cjs
 
 # Test the content API (use the token from above)
 curl -H "Authorization: Bearer <token>" http://localhost:8888/api/content/protocol-economics
@@ -45,15 +52,44 @@ curl -H "Authorization: Bearer <token>" http://localhost:8888/api/content/protoc
 
 ## Deploy to Netlify
 
+The blog is ready to deploy to Netlify out of the box.
+
+**Option A: Deploy from the Netlify UI**
+
+1. Push this repo to GitHub
+2. In Netlify, click "Add new site" > "Import an existing project"
+3. Select the repo and set the base directory to `ope-blog`
+4. Netlify auto-detects the build settings from `netlify.toml`
+5. Add the environment variable: `OPE_JWT_SECRET` = any random string (used to verify grant tokens)
+6. Deploy
+
+**Option B: Deploy from the CLI**
+
 ```bash
-# Set your secret
+cd ope-blog
+npm install -g netlify-cli
+netlify init
+
+# Set the JWT secret
 netlify env:set OPE_JWT_SECRET $(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
 
 # Deploy
 netlify deploy --prod
 ```
 
-The `netlify.toml` configures the function redirect (`/api/content/*` → serverless function) and ensures `.well-known` files are served with correct headers.
+The `netlify.toml` configures the function redirect (`/api/content/*` to the serverless function) and ensures `.well-known` files are served with correct headers.
+
+### What you get after deploying
+
+| URL | What it serves |
+|-----|---------------|
+| `/` | Blog homepage with free and gated posts |
+| `/feed.json` | JSON Feed 1.1 with OPE extensions on gated items |
+| `/.well-known/ope` | OPE discovery document (spec Section 6) |
+| `/api/content/{id}` | Gated content API, requires Bearer token |
+| `/subscribe/` | Subscription page with plans from the OPE config |
+
+Any OPE-compatible reader can discover this blog, parse the feed, and present gated content with subscribe prompts. The content API validates grant tokens and returns full HTML to entitled readers.
 
 ## Gating a post
 
@@ -65,11 +101,17 @@ title: My Premium Post
 date: 2026-03-25
 ope_gated: true
 ope_content_id: my-premium-post
+ope_resource_type: article
 ope_level: subscriber
 ope_cta: "Subscribe for $5/month to read the full post"
 ope_grants:
   - subscription
   - gift
+  - per_item
+  - trial
+ope_per_item_price:
+  currency: USD
+  amount: 200
 ---
 ```
 
@@ -77,22 +119,24 @@ The plugin handles the rest: preview extraction, feed metadata, content store en
 
 ## What an OPE-compatible reader sees
 
-When a reader like Pull Read fetches `/feed.json`, gated items look like this:
+When a reader fetches `/feed.json`, gated items include the OPE extension block:
 
 ```json
 {
   "id": "protocol-economics",
   "title": "Protocol Economics",
-  "content_text": "Every successful protocol creates a separation…",
+  "content_text": "Every successful protocol creates a separation...",
   "extensions": {
     "ope": {
       "required": { "level": "subscriber" },
-      "grants_allowed": ["subscription", "gift"],
+      "grants_allowed": ["subscription", "gift", "trial"],
       "content_id": "protocol-economics",
       "content_metadata": {
+        "resource_type": "essay",
         "word_count": 380,
         "estimated_read_time_minutes": 2,
-        "unlock_cta": "Subscribe for $5/month to read the full essay"
+        "unlock_cta": "Subscribe for $5/month to read the full essay",
+        "unlock_url": "https://ope-demo.netlify.app/posts/protocol-economics/?ope_unlock=1"
       }
     }
   }
@@ -101,37 +145,33 @@ When a reader like Pull Read fetches `/feed.json`, gated items look like this:
 
 The reader detects the `ope` extension, fetches `/.well-known/ope` for discovery, authenticates the user, obtains a grant token, and uses it to fetch full content from `/api/content/protocol-economics`.
 
-Readers without OPE support simply show the preview text and link to the post, graceful degradation.
+Readers without OPE support simply show the preview text and link to the post. Graceful degradation.
 
 ## Grant token types
 
 ```bash
 # Subscription (access to everything)
-OPE_JWT_SECRET=s node scripts/create-grant.js --user alice --type subscription
+OPE_JWT_SECRET=s node scripts/create-grant.cjs --user alice --type subscription
 
 # Per-item (access to one specific post)
-OPE_JWT_SECRET=s node scripts/create-grant.js --user bob --type per_item --content protocol-economics
+OPE_JWT_SECRET=s node scripts/create-grant.cjs --user bob --type per_item --content protocol-economics
+
+# Trial (7-day free trial)
+OPE_JWT_SECRET=s node scripts/create-grant.cjs --user carol --type trial --trial-days 7
 
 # Metered (5 articles remaining)
-OPE_JWT_SECRET=s node scripts/create-grant.js --user carol --type metered --meter 5
+OPE_JWT_SECRET=s node scripts/create-grant.cjs --user dave --type metered --meter 5
 
-# Gift
-OPE_JWT_SECRET=s node scripts/create-grant.js --user dave --type gift --ttl 86400
+# Gift (24-hour access)
+OPE_JWT_SECRET=s node scripts/create-grant.cjs --user eve --type gift --ttl 86400
+
+# See all options
+OPE_JWT_SECRET=s node scripts/create-grant.cjs --help
 ```
-
-## What this doesn't do (yet)
-
-- **OAuth flow**: grants are created via CLI/webhook, not a full OAuth dance
-- **Refresh tokens**: tokens expire and that's it; no refresh endpoint
-- **Batch endpoint**: single-item retrieval only
-- **Broker support**: no intermediary aggregation
-- **Stripe integration**: subscribe buttons are placeholders
-
-These are all additive. The core OPE flow (discovery → grant → content) works end to end.
 
 ## Spec
 
-See the full [OPE specification](https://feedspec.org) for the complete protocol design.
+See the full [OPE specification](https://feedspec.org/ope) for the complete protocol design.
 
 ## License
 
