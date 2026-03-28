@@ -3,11 +3,15 @@ export default function (eleventyConfig) {
   const publisherName = "OPE Demo Blog";
   const publisherId = "did:web:ope-demo.netlify.app";
   const defaultTtl = 3600;
+  const maxTtl = 86400;
   const plans = [
     { id: "monthly", name: "Monthly", currency: "USD", amount: 500 },
-    { id: "annual", name: "Annual", currency: "USD", amount: 4000 },
+    { id: "annual", name: "Annual", currency: "USD", amount: 5000 },
   ];
-  const grantsSupported = ["subscription", "gift", "per_item", "metered"];
+  const grantsSupported = [
+    "subscription", "gift", "per_item", "metered", "trial",
+    "ad_supported", "early_access",
+  ];
 
   // ── OPE global data ──
   eleventyConfig.addGlobalData("ope", {
@@ -15,9 +19,11 @@ export default function (eleventyConfig) {
     publisherName,
     publisherId,
     defaultTtl,
+    maxTtl,
     subscribeUrl: "/subscribe/",
     plans,
     grantsSupported,
+    brokerSupport: false,
   });
 
   // ── OPE filters ──

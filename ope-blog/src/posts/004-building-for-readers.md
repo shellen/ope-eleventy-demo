@@ -3,12 +3,17 @@ title: Building for Readers, Not Platforms
 date: 2026-03-25
 ope_gated: true
 ope_content_id: building-for-readers
+ope_resource_type: article
 ope_level: subscriber
-ope_cta: "Subscribe for $5/month to read the full post"
+ope_cta: "Subscribe for $5/month, or buy this article for $2"
 ope_grants:
   - subscription
   - gift
   - per_item
+  - trial
+ope_per_item_price:
+  currency: USD
+  amount: 200
 ---
 
 The most important person in the publishing ecosystem is the one who reads. Not the writer, not the platform, not the payment processor — the reader. And yet readers have the least power in the current system.

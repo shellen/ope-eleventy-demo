@@ -3,11 +3,13 @@ title: Protocol Economics — Why Separating Entitlement from Distribution Chang
 date: 2026-03-20
 ope_gated: true
 ope_content_id: protocol-economics
+ope_resource_type: essay
 ope_level: subscriber
 ope_cta: "Subscribe for $5/month to read the full essay"
 ope_grants:
   - subscription
   - gift
+  - trial
 ---
 
 Every successful protocol creates a separation that was previously fused together. HTTP separated content from transport. SMTP separated messages from mail servers. OAuth separated identity from applications.

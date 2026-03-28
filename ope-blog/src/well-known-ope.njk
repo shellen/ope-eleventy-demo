@@ -11,7 +11,7 @@ eleventyExcludeFromCollections: true
     "token_format": "jwt",
     "token_mode": "simple",
     "default_ttl_seconds": {{ ope.defaultTtl }},
-    "max_ttl_seconds": 86400
+    "max_ttl_seconds": {{ ope.maxTtl }}
   },
   "content": {
     "endpoint_template": "{{ ope.siteUrl }}/api/content/{id}",
@@ -23,5 +23,5 @@ eleventyExcludeFromCollections: true
     "plans": {{ ope.plans | dump | safe }}
   },
   "grants_supported": {{ ope.grantsSupported | dump | safe }},
-  "broker_support": false
+  "broker_support": {{ ope.brokerSupport }}
 }
