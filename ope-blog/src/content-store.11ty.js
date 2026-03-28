@@ -16,6 +16,7 @@ export function render(data) {
       store[id] = {
         id,
         title: post.data.title || "",
+        resource_type: post.data.ope_resource_type || "article",
         content_html: post.content || "",
         published: post.date ? post.date.toISOString() : new Date().toISOString(),
         author: { name: publisherName, url: siteUrl },

@@ -10,15 +10,18 @@ eleventyExcludeFromCollections: true
     "revocation_url": "{{ ope.siteUrl }}/api/entitlement/revoke",
     "token_format": "jwt",
     "token_mode": "simple",
-    "default_ttl_seconds": {{ ope.defaultTtl }}
+    "default_ttl_seconds": {{ ope.defaultTtl }},
+    "max_ttl_seconds": 86400
   },
   "content": {
     "endpoint_template": "{{ ope.siteUrl }}/api/content/{id}",
+    "batch_endpoint": "{{ ope.siteUrl }}/api/content/batch",
     "formats_available": ["html"]
   },
   "metadata": {
     "subscribe_url": "{{ ope.subscribeUrl }}",
     "plans": {{ ope.plans | dump | safe }}
   },
-  "grants_supported": {{ ope.grantsSupported | dump | safe }}
+  "grants_supported": {{ ope.grantsSupported | dump | safe }},
+  "broker_support": false
 }

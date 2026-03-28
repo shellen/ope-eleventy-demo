@@ -1,6 +1,8 @@
 # OPE Demo Suite
 
-Working implementations of every layer in the [Open Portable Entitlement (OPE)](https://feedspec.org) architecture — publisher, gateway, and reader — so you can see the full protocol in action without reading spec prose.
+Working implementations of every layer in the [Open Portable Entitlement (OPE)](https://feedspec.org) architecture — publisher, gateway, and reader — so you can see the full protocol in action with running code.
+
+Aligned with **OPE spec v0.1** (March 2026).
 
 ## What's in this repo
 
@@ -12,6 +14,8 @@ eleventy-plugin-ope/     ← Plugin:    Reusable Eleventy plugin for adding OPE 
 ```
 
 ### How OPE works
+
+OPE separates four concerns: content, distribution, entitlement, and payments (spec Section 3). This repo demonstrates the first three. Payments are explicitly out of scope — OPE proves access, it doesn't move money.
 
 ```
 ┌──────────┐       ┌──────────┐       ┌──────────┐
@@ -25,14 +29,14 @@ eleventy-plugin-ope/     ← Plugin:    Reusable Eleventy plugin for adding OPE 
 │           │◄─8───│          │       │          │
 └──────────┘       └──────────┘       └──────────┘
 
-1. GET /.well-known/ope        → Discover publisher's OPE config
-2. ← Discovery document        (content endpoint, grants supported, plans)
-3. GET /feed.json              → Fetch JSON Feed with OPE extensions
-4. ← Feed with gated items     (previews, content IDs, metadata)
-5. POST /api/entitlement/grant → Request a grant token
-6. ← JWT grant token            (subscription, per_item, metered, gift)
-7. GET /api/content/{id}       → Fetch gated content with Bearer token
-8. ← Full content               (HTML, verified via JWT)
+1. GET /.well-known/ope        → Discover publisher capabilities (§6)
+2. ← Discovery document        (content endpoint, token mode, plans, broker support)
+3. GET /feed.json              → Fetch JSON Feed with OPE extensions (§9)
+4. ← Feed with gated items     (previews, content_metadata, resource_type, unlock_url)
+5. POST /api/entitlement/grant → Request grant + refresh token (§8)
+6. ← JWT grant token            (14 grant types: subscription, trial, bundle, ...)
+7. GET /api/content/{id}       → Fetch gated content with Bearer token (§10)
+8. ← Full content               (articles, podcasts, video — resource-agnostic)
 ```
 
 ---
@@ -68,7 +72,7 @@ cd ope-reader
 node reader.js
 ```
 
-The reader will discover the publisher, fetch the feed, acquire a grant from the gateway, fetch gated content, refresh the token, and then revoke it — printing every step.
+The reader will discover the publisher, fetch the feed, acquire a grant from the gateway, fetch gated content, refresh the token (with rotation), and revoke it — printing every step with spec section references.
 
 ---
 
@@ -76,10 +80,10 @@ The reader will discover the publisher, fetch the feed, acquire a grant from the
 
 A complete Eleventy blog with:
 
-- **JSON Feed** (`/feed.json`) with OPE extension blocks on gated items
-- **Discovery endpoint** (`/.well-known/ope`) advertising content API, plans, and grant types
-- **Content API** (Netlify function at `/api/content/{id}`) that validates JWT grants and returns full HTML
-- **Build-time content store** — gated post content compiled to JSON at build time
+- **JSON Feed** (`/feed.json`) with OPE extension blocks including `resource_type`, `unlock_url`, and `per_item_price` (spec §9.1)
+- **Discovery endpoint** (`/.well-known/ope`) with `max_ttl_seconds`, `batch_endpoint`, `broker_support` (spec §6)
+- **Content API** (Netlify function at `/api/content/{id}`) with spec-aligned error responses (`error`, `error_description`, `ope_discovery`) (spec §10.3)
+- **Build-time content store** — gated post content compiled to JSON with `resource_type`
 - **Sample posts** — mix of free and gated content with OPE frontmatter
 
 Posts are gated with frontmatter:
@@ -89,6 +93,7 @@ Posts are gated with frontmatter:
 ope_gated: true
 ope_content_id: protocol-economics
 ope_level: subscriber
+ope_resource_type: article
 ope_cta: "Subscribe for $5/month to read the full essay"
 ope_grants:
   - subscription
@@ -102,14 +107,16 @@ See [`ope-blog/README.md`](./ope-blog/README.md) for deployment details.
 
 ## Gateway: ope-gateway
 
-A sample Express server implementing the three OPE gateway endpoints:
+A sample Express server implementing the OPE gateway endpoints:
 
-| Endpoint | Method | What it does |
-|----------|--------|-------------|
-| `/api/entitlement/grant` | POST | Issue a JWT grant token for a subscriber |
-| `/api/entitlement/refresh` | POST | Refresh an existing grant before expiry |
-| `/api/entitlement/revoke` | POST | Revoke a grant (e.g., on cancellation) |
-| `/.well-known/ope` | GET | Gateway discovery document |
+| Endpoint | Method | Spec section | What it does |
+|----------|--------|-------------|-------------|
+| `/api/entitlement/grant` | POST | §8 | Issue a JWT grant token + refresh token |
+| `/api/entitlement/refresh` | POST | §12.3 | Refresh with token rotation |
+| `/api/entitlement/revoke` | POST | §12.2 | Revoke with reason code |
+| `/.well-known/ope` | GET | §6 | Gateway discovery document |
+
+Supports all 14 grant types from the spec (§21): `subscription`, `per_item`, `gift`, `institutional`, `metered`, `locale_free`, `patronage`, `broker`, `trial`, `rental`, `bundle`, `ad_supported`, `early_access`, `family`.
 
 Try it with curl:
 
@@ -119,13 +126,18 @@ curl -s http://localhost:4000/api/entitlement/grant \
   -H "Content-Type: application/json" \
   -d '{"user_id": "alice", "grant_type": "subscription"}' | jq
 
-# Use the token to fetch gated content from the publisher
+# Use the grant_token to fetch gated content from the publisher
 TOKEN=$(curl -s http://localhost:4000/api/entitlement/grant \
   -H "Content-Type: application/json" \
-  -d '{"user_id": "alice", "grant_type": "subscription"}' | jq -r .token)
+  -d '{"user_id": "alice", "grant_type": "subscription"}' | jq -r .grant_token)
 
 curl -s http://localhost:8080/api/content/protocol-economics \
   -H "Authorization: Bearer $TOKEN" | jq
+
+# Try a trial grant
+curl -s http://localhost:4000/api/entitlement/grant \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "bob", "grant_type": "trial"}' | jq
 ```
 
 See [`ope-gateway/README.md`](./ope-gateway/README.md) for all options.
@@ -136,12 +148,12 @@ See [`ope-gateway/README.md`](./ope-gateway/README.md) for all options.
 
 A zero-dependency Node.js script (requires Node 18+ for built-in `fetch`) that demonstrates the complete OPE lifecycle:
 
-1. **Discover** — `GET /.well-known/ope`
-2. **Browse** — `GET /feed.json`, list free vs. gated items
-3. **Subscribe** — `POST /api/entitlement/grant` to the gateway
-4. **Read** — `GET /api/content/{id}` with the JWT
-5. **Refresh** — `POST /api/entitlement/refresh`
-6. **Revoke** — `POST /api/entitlement/revoke`
+1. **Discover** — `GET /.well-known/ope` (§6)
+2. **Browse** — `GET /feed.json`, show `resource_type`, `unlock_cta`, `per_item_price` (§9)
+3. **Subscribe** — `POST /api/entitlement/grant` to the gateway (§8)
+4. **Read** — `GET /api/content/{id}` with the JWT, handle `media` objects (§10)
+5. **Refresh** — `POST /api/entitlement/refresh` with token rotation (§12.3)
+6. **Revoke** — `POST /api/entitlement/revoke` with reason code (§12.2)
 
 ```bash
 node ope-reader/reader.js
@@ -179,9 +191,33 @@ See [`eleventy-plugin-ope/README.md`](./eleventy-plugin-ope/README.md) for the f
 
 ---
 
+## Spec coverage
+
+This demo suite covers:
+
+| Spec section | Feature | Implemented in |
+|-------------|---------|---------------|
+| §6 | Discovery (`/.well-known/ope`) | ope-blog, ope-gateway |
+| §8 | Grant tokens (all 14 types, JWT) | ope-gateway |
+| §9.1 | JSON Feed extensions (`content_metadata`, `resource_type`, `unlock_url`) | ope-blog |
+| §10.1 | Single content retrieval | ope-blog (content API) |
+| §10.3 | Structured error responses | ope-blog (content API) |
+| §12.2 | Token revocation with reason | ope-gateway |
+| §12.3 | Refresh token rotation | ope-gateway, ope-reader |
+| §13 | Multi-publisher session management | ope-reader (per-publisher design) |
+| §19 | Implementer guide reference architecture | all components |
+| §22 | Worked example flow | ope-reader |
+
+Not yet implemented (future work):
+- §7: Full OAuth 2.0 + PKCE (this demo uses simplified auth for clarity)
+- §10.2: Batch content retrieval endpoint
+- §11: Web-based entitlement (HTTP 402, cookie transport, browser unlock)
+- §14: Entitlement brokers
+- §15: AT Protocol integration
+
 ## Spec
 
-[Open Portable Entitlement specification](https://feedspec.org)
+[Open Portable Entitlement specification v0.1](https://feedspec.org/ope)
 
 ## License
 
