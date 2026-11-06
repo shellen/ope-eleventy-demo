@@ -9,7 +9,8 @@ import opeConfig from "./ope.config.js";
 import { createGate } from "./lib/ope-gate.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const SITE = join(__dirname, "_site");
+// OPE_SITE_DIR lets tests serve a build made for other ports.
+const SITE = process.env.OPE_SITE_DIR || join(__dirname, "_site");
 const PORT = process.env.PORT || 8080;
 
 // The publisher's introspection credential at the License Server, issued out of band
