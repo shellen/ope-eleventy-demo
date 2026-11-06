@@ -1,15 +1,15 @@
 # ope-license-server
 
-A readable OPE v0.2 License Server: an OAuth 2.0 authorization server that issues License Tokens. It's one file (`server.js`), and each section names the spec section it implements. Read it next to the [spec](https://feedspec.org/ope/spec/0.2/).
+A readable OPE v0.2 License Server: an OAuth 2.0 authorization server that issues License Tokens. The server is one file (`app.js`), and each section names the spec section it implements. `server.js` runs it locally; `netlify/functions/ls.mjs` runs it on Netlify. Read it next to the [spec](https://feedspec.org/ope/spec/0.2/).
 
-It's a teaching implementation. Everything lives in memory, sign-in takes any name with no password, and "checkout" is a button. A production-grade server is tracked in [open-portable-entitlement#11](https://github.com/shellen/open-portable-entitlement/issues/11).
+It's a teaching implementation. Sign-in takes any name with no password, and "checkout" is a button. State lives in memory locally, and in one Netlify Blobs entry on Netlify. A production-grade server is tracked in [open-portable-entitlement#11](https://github.com/shellen/open-portable-entitlement/issues/11).
 
 ## Run
 
 ```bash
 npm install
 OPE_RS_CLIENT_SECRET=dev-secret npm start      # http://localhost:4000
-npm test                                        # end-to-end tests (builds and starts the publisher too)
+npm test                                        # end-to-end tests, run twice: locally, and through the Netlify Function with Blobs
 ```
 
 Give the publisher the same `OPE_RS_CLIENT_SECRET`, or use `../run-demo.sh`, which does it for you.
@@ -17,12 +17,26 @@ Give the publisher the same `OPE_RS_CLIENT_SECRET`, or use `../run-demo.sh`, whi
 | Variable | Default | What it is |
 |---|---|---|
 | `PORT` | `4000` | |
-| `OPE_ISSUER` | `http://localhost:$PORT` | The `iss` of every token |
+| `OPE_ISSUER` | Netlify's `URL`, else `http://localhost:$PORT` | The `iss` of every token |
+| `OPE_LS_KEY` | a fresh key each start | The private signing key, as one line of JWK JSON. `npm run generate-key` prints one. Required for a hosted server |
 | `OPE_PROTECTED_RESOURCES` | `http://localhost:8080/posts/` | Scopes this server issues for, comma-separated (spec §7.2) |
 | `OPE_RS_CLIENT_ID` | `ope-demo-blog` | A publisher's introspection credential (spec §13.4) |
 | `OPE_RS_CLIENT_SECRET` | none | Without it, introspection is off and revocation only takes effect at expiry |
 | `OPE_RS_PUBLISHER` | `http://localhost:8080/` | The Publisher that credential may introspect for |
-| `OPE_SUBJECT_SECRET` | random per start | Key for pairwise subject identifiers. Set it to keep `sub` stable across restarts |
+| `OPE_SUBJECT_SECRET` | derived from `OPE_LS_KEY`, else random per start | Key for pairwise subject identifiers |
+
+## On Netlify
+
+Create a Netlify site from this repository with base directory `ope-license-server`. `netlify.toml` routes every path to the one function. Set these in the site's environment variables:
+
+| Variable | Value |
+|---|---|
+| `OPE_LS_KEY` | The output of `npm run generate-key`, run on your own machine. Treat it like a password |
+| `OPE_PROTECTED_RESOURCES` | The publisher's scope, for example `https://your-blog.netlify.app/posts/` |
+| `OPE_RS_PUBLISHER` | The publisher's identifier, for example `https://your-blog.netlify.app/` |
+| `OPE_RS_CLIENT_SECRET` | A random secret. Give the publisher the same value |
+
+The function loads its state from Netlify Blobs before each request and saves it after. The save only succeeds if nobody else saved in between; otherwise the request runs again on the fresher state. The response waits for the save, so concurrent requests can't lose a refresh-token rotation.
 
 ## Endpoints
 
@@ -67,4 +81,4 @@ The header is `{"alg":"ES256","typ":"license+jwt","kid":"ls-…"}`.
 
 ## Not here
 
-Real accounts and payment, persistence, key rotation, group and `limit` Entitlements, bundles, agent tokens (§13), and a reviewed-client list for publishers that set `client_policy`. With a `client_policy` that doesn't allow everyone, `/authorize` refuses, because no app here is reviewed.
+Real accounts and payment, a database built for more than a demo's traffic, key rotation, group and `limit` Entitlements, bundles, agent tokens (§13), and a reviewed-client list for publishers that set `client_policy`. With a `client_policy` that doesn't allow everyone, `/authorize` refuses, because no app here is reviewed.

@@ -34,8 +34,9 @@ async function waitFor(url) {
   throw new Error(`${url} did not start`);
 }
 
-function start(cwd, env) {
-  const p = spawn(process.execPath, ["server.js"], { cwd, env: { ...process.env, ...env }, stdio: ["ignore", "ignore", "inherit"] });
+// OPE_LS_ENTRY=test/netlify-shim.mjs runs the License Server through its Netlify Function.
+function start(cwd, env, entry = "server.js") {
+  const p = spawn(process.execPath, [entry], { cwd, env: { ...process.env, ...env }, stdio: ["ignore", "ignore", "inherit"] });
   procs.push(p);
 }
 
@@ -52,7 +53,7 @@ before(async () => {
   start(join(ROOT, "ope-license-server"), {
     PORT: "4298", OPE_PROTECTED_RESOURCES: SCOPE,
     OPE_RS_CLIENT_ID: "ope-demo-blog", OPE_RS_CLIENT_SECRET: RS_SECRET, OPE_RS_PUBLISHER: `${SITE}/`,
-  });
+  }, process.env.OPE_LS_ENTRY);
   await Promise.all([waitFor(SITE), waitFor(LS)]);
 });
 

@@ -6,10 +6,13 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.js && OPE_LS_ENTRY=test/netlify-shim.mjs node --test test/flow.test.js",
+    "generate-key": "node scripts/generate-key.mjs"
   },
   "dependencies": {
+    "@netlify/blobs": "^11.1.8",
     "express": "^4.21.0",
-    "jose": "^6.2.15"
+    "jose": "^6.2.15",
+    "serverless-http": "^4.0.0"
   }
 }
