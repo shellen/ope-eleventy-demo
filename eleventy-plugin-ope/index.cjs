@@ -128,6 +128,8 @@ module.exports = function opePlugin(eleventyConfig, config) {
           title: post.data.title,
           full: `/_ope/full${post.url}index.html`,
           preview: `${post.url}index.html`,
+          // Posts with Offers of their own have per-URL metadata; challenges point to it.
+          ...(post.data.ope_offers ? { metadata: metadataPath(absolute(post.url)) } : {}),
         }])), null, 2),
     },
     { permalink: "/_ope/gated.json", eleventyExcludeFromCollections: true },

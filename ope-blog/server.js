@@ -62,6 +62,7 @@ app.use(async (req, res, next) => {
     method: req.method,
     url: opeConfig.siteUrl + req.url,
     headers: req.headers,
+    resourceMetadata: entry.metadata && opeConfig.siteUrl + entry.metadata,
   });
   for (const [name, value] of Object.entries(result.headers)) res.append(name, value);
   res.set("Access-Control-Expose-Headers", "WWW-Authenticate, Entitlement-Remaining");

@@ -28,20 +28,23 @@ export function createGate(config, options = {}) {
   const usage = new Map(); // limit Entitlements: sub|resource|window → count
 
   // ── Challenges and errors (spec §11.4) ──
-  function challenge(scope, error, description) {
-    const params = [`ope_scope="${scope}"`];
+  // A challenge leads a Client to the metadata (spec §7.1): resource_metadata for a
+  // URL with its own document, otherwise ope_scope naming the scope that covers it.
+  // lead is that parameter, ready to send.
+  function challenge(lead, error, description) {
+    const params = [lead];
     if (error) params.push(`error="${error}"`);
     if (description) params.push(`error_description="${description}"`);
     return [`DPoP algs="ES256", ${params.join(", ")}`, `License ${params.join(", ")}`];
   }
 
-  function refuse(status, scope, error, description, extra = {}) {
+  function refuse(status, lead, error, description, extra = {}) {
     return {
       ok: false,
       status,
       error,
       description,
-      headers: { "WWW-Authenticate": challenge(scope, error, description), ...extra },
+      headers: { "WWW-Authenticate": challenge(lead, error, description), ...extra },
     };
   }
 
@@ -119,7 +122,8 @@ export function createGate(config, options = {}) {
 
   // ── The checks, in spec §11.2 order ──
   // request: { method, url (as requested, absolute), headers (lower-case names) }
-  async function check({ method, url, headers }) {
+  // resourceMetadata: the per-URL metadata URL, when this Asset has one.
+  async function check({ method, url, headers, resourceMetadata }) {
     const scopeEntry = { scope: config.scopes[0].scope };
 
     // Encoded path separators are ambiguous across servers: refuse them (spec §5.3).
@@ -133,11 +137,12 @@ export function createGate(config, options = {}) {
     const parsed = new URL(url);
     const asset = parsed.origin + parsed.pathname;
     const scope = (scopeFor(asset) || scopeEntry).scope;
+    const lead = resourceMetadata ? `resource_metadata="${resourceMetadata}"` : `ope_scope="${scope}"`;
 
     // No credentials, or a scheme OPE doesn't accept (Bearer: spec §14 downgrade):
     // 402 says the post is for sale; the challenge carries no error code (spec §11.4).
     const match = (headers.authorization || "").match(/^(DPoP|License)\s+(\S+)$/i);
-    if (!match) return refuse(402, scope);
+    if (!match) return refuse(402, lead);
     const scheme = match[1].toLowerCase() === "dpop" ? "DPoP" : "License";
     const token = match[2];
 
@@ -149,7 +154,7 @@ export function createGate(config, options = {}) {
       issuer = decodeJwt(token).iss;
       if (!config.licenseServers.includes(issuer)) throw new Error("issuer not listed in our metadata");
     } catch (e) {
-      return refuse(401, scope, "invalid_token", e.message);
+      return refuse(401, lead, "invalid_token", e.message);
     }
     let info;
     try {
@@ -166,7 +171,7 @@ export function createGate(config, options = {}) {
         requiredClaims: ["exp", "iat", "jti", "sub", "client_id", "resource", "publisher", "terms", "entitlement"],
       }));
     } catch (e) {
-      return refuse(401, scope, "invalid_token", e.code || e.message);
+      return refuse(401, lead, "invalid_token", e.code || e.message);
     }
 
     // 3. The token's resource covers this Asset, as coverage says (spec §10.4),
@@ -176,28 +181,28 @@ export function createGate(config, options = {}) {
       ? claims.resource === asset
       : ent.coverage === "collection" && claims.resource.endsWith("/") && asset.startsWith(claims.resource);
     if (!covers || claims.publisher !== config.publisher) {
-      return refuse(403, scope, "insufficient_scope", "token does not cover this post");
+      return refuse(403, lead, "insufficient_scope", "token does not cover this post");
     }
 
     // 4. The Entitlement permits serving: status alone never does; rentals end.
     const now = Math.floor(Date.now() / 1000);
     if (ent.type !== "access" && ent.type !== "limit") {
-      return refuse(403, scope, "no_entitlement", "this Entitlement does not include access");
+      return refuse(403, lead, "no_entitlement", "this Entitlement does not include access");
     }
     if (ent.duration === "rental" && !(now < ent.rental_expires_at)) {
-      return refuse(403, scope, "no_entitlement", "rental has ended");
+      return refuse(403, lead, "no_entitlement", "rental has ended");
     }
 
     // 5. Sender constraint: a bound token needs its DPoP proof; DPoP needs a bound token.
     if (claims.cnf && claims.cnf.jkt) {
-      if (scheme !== "DPoP") return refuse(401, scope, "invalid_token", "bound token presented without proof");
+      if (scheme !== "DPoP") return refuse(401, lead, "invalid_token", "bound token presented without proof");
       try {
         await verifyProof(headers.dpop, { method, htu: asset, accessToken: token, jkt: claims.cnf.jkt });
       } catch (e) {
-        return refuse(401, scope, "invalid_token", e.message);
+        return refuse(401, lead, "invalid_token", e.message);
       }
     } else if (scheme === "DPoP") {
-      return refuse(401, scope, "invalid_token", "DPoP scheme with an unbound token");
+      return refuse(401, lead, "invalid_token", "DPoP scheme with an unbound token");
     }
 
     // 6. Revocation: introspect unless the token is within our tolerance (spec §12.3).
@@ -205,9 +210,9 @@ export function createGate(config, options = {}) {
       try {
         const result = await introspect(info.metadata, token, asset);
         if (!result.active) {
-          return refuse(401, scope, "invalid_token", `inactive: ${result.revocation_reason || "revoked"}`);
+          return refuse(401, lead, "invalid_token", `inactive: ${result.revocation_reason || "revoked"}`);
         }
-        if (result.permitted === false) return refuse(403, scope, "insufficient_scope", "not permitted");
+        if (result.permitted === false) return refuse(403, lead, "insufficient_scope", "not permitted");
       } catch {
         return { ok: false, status: 503, error: "temporarily_unavailable", description: "introspection failed", headers: { "Retry-After": "30" } };
       }
@@ -218,7 +223,7 @@ export function createGate(config, options = {}) {
     if (ent.type === "limit") {
       const key = `${claims.sub}|${claims.resource}|${periodWindow(ent.period)}`;
       const used = (usage.get(key) || 0) + 1;
-      if (used > ent.quota) return refuse(403, scope, "quota_exceeded", "monthly limit reached");
+      if (used > ent.quota) return refuse(403, lead, "quota_exceeded", "monthly limit reached");
       usage.set(key, used);
       extraHeaders["Entitlement-Remaining"] = String(ent.quota - used);
     }

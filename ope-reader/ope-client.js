@@ -103,10 +103,18 @@ export function createClient(options = {}) {
     log("discover", { status: res.status, challenges });
     if (res.status !== 402 && res.status !== 401) return { asset, status: res.status, free: res.ok };
 
-    // Per-URL metadata first, then the scope's (spec §5.6).
+    // Follow the challenge to the metadata (spec §7.1). Each document must name,
+    // as its resource, the identifier that led to it, or it is discarded.
+    const pointer = challenges.map((c) => c.params.resource_metadata).find(Boolean);
+    const candidates = [];
+    if (pointer) candidates.push([pointer, asset]);
+    if (scope && new URL(scope).origin === new URL(asset).origin && asset.startsWith(scope)) {
+      candidates.push([metadataUrl(scope), scope]); // built from the scope, never taken from elsewhere
+    }
+    if (!candidates.length) candidates.push([metadataUrl(asset), asset]);
     let resourceMetadata = null;
-    for (const id of [asset, scope].filter(Boolean)) {
-      const r = await fetchPublisher(metadataUrl(id), {});
+    for (const [url, id] of candidates) {
+      const r = await fetchPublisher(url, {});
       if (!r.ok) continue;
       const doc = await json(r);
       if (doc.resource === id) { resourceMetadata = doc; break; }
@@ -149,14 +157,16 @@ export function createClient(options = {}) {
   async function tokenRequest(authServer, params, dpopKey) {
     const headers = { "Content-Type": "application/x-www-form-urlencoded" };
     if (dpopKey) headers.DPoP = await dpopProof(dpopKey, "POST", authServer.token_endpoint);
-    const res = await fetch(authServer.token_endpoint, { method: "POST", headers, body: new URLSearchParams(params) });
-    const body = await json(res);
+    // Leave out parameters the caller didn't give (resource is optional on exchange).
+    const body = new URLSearchParams(Object.entries(params).filter(([, v]) => v !== undefined && v !== null));
+    const res = await fetch(authServer.token_endpoint, { method: "POST", headers, body });
+    const answer = await json(res);
     if (!res.ok) {
-      const err = new Error(`${body.error}: ${body.error_description || ""}`);
-      err.oauth = body;
+      const err = new Error(`${answer.error}: ${answer.error_description || ""}`);
+      err.oauth = answer;
       throw err;
     }
-    return body;
+    return answer;
   }
 
   // Step 4 (spec §8.5): exchange the code. With a DPoP key the token is bound to it.

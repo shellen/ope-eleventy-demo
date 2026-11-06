@@ -100,6 +100,9 @@ describe("Discovery (spec §7, Appendix B.1)", () => {
 
   it("a post with its own Offers resolves to its per-URL metadata", async () => {
     const found = await client.discover(ITEM_POST);
+    assert.equal(found.challenges[0].params.resource_metadata,
+      `${SITE}/.well-known/oauth-protected-resource/posts/004-building-for-readers/`);
+    assert.equal(found.challenges[0].params.ope_scope, undefined);
     assert.equal(found.resourceMetadata.resource, ITEM_POST);
     assert.ok(found.resourceMetadata.ope.offers.some((o) => o.id === "item-building-for-readers"));
   });

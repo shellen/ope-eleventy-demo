@@ -27,7 +27,12 @@ export async function handler(event) {
   if (!entry) return { statusCode: 404, body: "Not found" };
 
   const headers = Object.fromEntries(Object.entries(event.headers).map(([k, v]) => [k.toLowerCase(), v]));
-  const result = await gate.check({ method: event.httpMethod, url: opeConfig.siteUrl + url.pathname + url.search, headers });
+  const result = await gate.check({
+    method: event.httpMethod,
+    url: opeConfig.siteUrl + url.pathname + url.search,
+    headers,
+    resourceMetadata: entry.metadata && opeConfig.siteUrl + entry.metadata,
+  });
 
   const multiValueHeaders = Object.fromEntries(
     Object.entries(result.headers).map(([k, v]) => [k, Array.isArray(v) ? v : [v]]));
