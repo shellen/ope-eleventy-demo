@@ -181,7 +181,8 @@ async function termsReference(terms) {
 function activeEntitlementFor(account, resource, publisher) {
   return (entitlements.get(account) || [])
     .filter((e) => e.state === "active" && e.publisher === publisher && covers(e, resource))
-    // Prefer a direct purchase over a group one (spec §13.7), then the widest coverage.
+    // Prefer the widest coverage, so a subscriber gets a token for the whole scope.
+    // (Every Entitlement here is a direct purchase; spec §13.7 orders group ones after.)
     .sort((a, b) => (a.coverage === "collection" ? -1 : 1) - (b.coverage === "collection" ? -1 : 1))[0];
 }
 
