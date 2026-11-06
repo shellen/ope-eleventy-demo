@@ -1,3 +1,5 @@
+# Hosted deploy of the OPE demo publisher. The License Server is not hosted yet,
+# so the hosted site stays on the v0.1 branch until it is (see README).
 [build]
   command = "npx @11ty/eleventy"
   publish = "_site"
@@ -5,15 +7,9 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["_site/api/content/_store.json"]
+  included_files = ["_site/_ope/**", "_site/posts/**"]
 
-# Route /api/content/* to the serverless function
-[[redirects]]
-  from = "/api/content/*"
-  to = "/.netlify/functions/content"
-  status = 200
-
-# Ensure .well-known files are served correctly
+# OAuth metadata: JSON, readable from any origin
 [[headers]]
   for = "/.well-known/*"
   [headers.values]

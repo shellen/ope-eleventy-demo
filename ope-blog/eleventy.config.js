@@ -1,56 +1,11 @@
+// ABOUTME: Eleventy configuration for the OPE demo blog.
+// ABOUTME: Registers the OPE plugin with the shared settings in ope.config.js.
+
+import opePlugin from "eleventy-plugin-ope";
+import opeConfig from "./ope.config.js";
+
 export default function (eleventyConfig) {
-  const siteUrl = process.env.URL || "https://ope-demo.netlify.app";
-  const publisherName = "OPE Demo Blog";
-  const publisherId = "did:web:ope-demo.netlify.app";
-  const defaultTtl = 3600;
-  const maxTtl = 86400;
-  const plans = [
-    { id: "monthly", name: "Monthly", currency: "USD", amount: 500 },
-    { id: "annual", name: "Annual", currency: "USD", amount: 5000 },
-  ];
-  const grantsSupported = [
-    "subscription", "gift", "per_item", "metered", "trial",
-    "ad_supported", "early_access",
-  ];
-
-  // ── OPE global data ──
-  eleventyConfig.addGlobalData("ope", {
-    siteUrl,
-    publisherName,
-    publisherId,
-    defaultTtl,
-    maxTtl,
-    subscribeUrl: "/subscribe/",
-    plans,
-    grantsSupported,
-    brokerSupport: false,
-  });
-
-  // ── OPE filters ──
-  eleventyConfig.addFilter("opePreview", function (content, maxChars) {
-    if (maxChars === undefined) maxChars = 280;
-    if (!content) return "";
-    const stripped = content.replace(/<[^>]+>/g, "");
-    if (stripped.length <= maxChars) return stripped;
-    return stripped.substring(0, maxChars).replace(/\s+\S*$/, "") + "\u2026";
-  });
-
-  eleventyConfig.addFilter("opeWordCount", function (content) {
-    if (!content) return 0;
-    return content.replace(/<[^>]+>/g, "").split(/\s+/).filter(Boolean).length;
-  });
-
-  eleventyConfig.addFilter("opeReadTime", function (content) {
-    if (!content) return 0;
-    const words = content.replace(/<[^>]+>/g, "").split(/\s+/).filter(Boolean).length;
-    return Math.ceil(words / 250);
-  });
-
-  eleventyConfig.addFilter("jsonEscape", function (str) {
-    if (!str) return "";
-    return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "");
-  });
-
+  eleventyConfig.addPlugin(opePlugin, opeConfig);
   eleventyConfig.configureErrorReporting({ allowMissingExtensions: true });
 
   return {

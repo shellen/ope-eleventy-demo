@@ -1,0 +1,9 @@
+---
+permalink: _redirects
+eleventyExcludeFromCollections: true
+---
+{#- ABOUTME: Netlify routing: gated posts go through the OPE check; full versions are never served directly. -#}
+/_ope/*  /404.html  404!
+{%- for post in collections.opeGated %}
+{{ post.url }}  /.netlify/functions/gate  200!
+{%- endfor %}

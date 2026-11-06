@@ -1,13 +1,12 @@
 {
   "name": "ope-blog",
-  "version": "0.1.0",
-  "description": "Minimal Eleventy blog with Open Portable Entitlement (OPE) support",
+  "version": "0.2.0",
+  "description": "Minimal Eleventy blog with Open Portable Entitlement (OPE) v0.2 support",
   "scripts": {
     "build": "npx @11ty/eleventy",
     "start": "node server.js",
     "dev": "npx @11ty/eleventy && node server.js",
-    "test": "npx @11ty/eleventy --quiet && node --test test-server.js",
-    "grant": "node scripts/create-grant.cjs"
+    "test": "npx @11ty/eleventy --quiet && node --test test/*.test.js"
   },
   "keywords": [
     "ope",
@@ -21,7 +20,9 @@
   "dependencies": {
     "@11ty/eleventy": "^3.0.0",
     "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.0"
+    "jose": "^6.2.15",
+    "jsonwebtoken": "^9.0.0",
+    "eleventy-plugin-ope": "file:../eleventy-plugin-ope"
   },
   "type": "module"
 }

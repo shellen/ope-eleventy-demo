@@ -14,11 +14,9 @@ layout: base.njk
       <p>{{ content | opePreview(400) }}</p>
     </div>
     <div class="gated-notice">
-      <div class="stats">
-        {{ content | opeWordCount }} words · {{ content | opeReadTime }} min read
-        {% if ope_per_item_price %} · ${{ (ope_per_item_price.amount / 100) | round(2) }} per article{% endif %}
-      </div>
+      <div class="stats">{{ content | opeWordCount }} words · {{ content | opeReadTime }} min read</div>
       <p style="margin-bottom: 0.75rem">{{ ope_cta | default("Subscribe to read the full post") }}</p>
+      <p style="margin-bottom: 0.75rem; font-size: 0.85rem">Already a subscriber? Open this post in any app that supports OPE.</p>
       <a href="/subscribe/" class="cta">Subscribe</a>
     </div>
   {% else %}
