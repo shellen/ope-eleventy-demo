@@ -6,414 +6,212 @@
 <title>OPE Reader Demo</title>
 <style>
   :root {
-    --bg: #fafafa; --fg: #1a1a1a; --muted: #666; --border: #ddd;
-    --accent: #2563eb; --accent-light: #dbeafe;
-    --green: #16a34a; --green-light: #dcfce7;
-    --orange: #ea580c; --orange-light: #fff7ed;
-    --red: #dc2626; --red-light: #fef2f2;
-    --code-bg: #f3f4f6; --card-bg: #fff;
-    --radius: 8px; --font: system-ui, -apple-system, sans-serif;
-    --mono: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+    --bg: #fafafa; --fg: #18181b; --muted: #52525b; --border: #e4e4e7; --card: #fff; --code: #f4f4f5;
+    --accent: #047857; --accent-bg: #ecfdf5; --warn: #b45309; --warn-bg: #fffbeb; --bad: #b91c1c; --bad-bg: #fef2f2;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font); background: var(--bg); color: var(--fg); line-height: 1.6; }
-
-  header {
-    background: var(--fg); color: #fff; padding: 1.5rem 2rem;
-    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #09090b; --fg: #fafafa; --muted: #a1a1aa; --border: #27272a; --card: #18181b; --code: #27272a;
+      --accent: #34d399; --accent-bg: #052e22; --warn: #fbbf24; --warn-bg: #2a1d05; --bad: #f87171; --bad-bg: #2a0b0b; }
   }
-  header h1 { font-size: 1.25rem; font-weight: 600; }
-  header .badge {
-    background: var(--accent); color: #fff; font-size: 0.7rem;
-    padding: 0.2rem 0.5rem; border-radius: 3px; font-weight: 600;
-  }
-  header p { color: #999; font-size: 0.85rem; width: 100%; }
-
-  .container { max-width: 900px; margin: 0 auto; padding: 1.5rem; }
-
-  /* Steps */
-  .step {
-    background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius);
-    margin-bottom: 1rem; overflow: hidden;
-  }
-  .step-header {
-    display: flex; align-items: center; gap: 0.75rem;
-    padding: 0.75rem 1rem; border-bottom: 1px solid var(--border);
-    background: var(--code-bg); cursor: default;
-  }
-  .step-num {
-    width: 28px; height: 28px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 0.8rem; font-weight: 700; flex-shrink: 0;
-    background: var(--border); color: var(--muted);
-  }
-  .step.active .step-num { background: var(--accent); color: #fff; }
-  .step.done .step-num { background: var(--green); color: #fff; }
-  .step.error .step-num { background: var(--red); color: #fff; }
-  .step-title { font-weight: 600; font-size: 0.95rem; flex: 1; }
-  .step-spec { font-size: 0.75rem; color: var(--muted); font-family: var(--mono); }
-  .step-body { padding: 1rem; display: none; }
-  .step.active .step-body, .step.done .step-body, .step.error .step-body { display: block; }
-
-  /* Request/Response blocks */
-  .req-res { margin: 0.5rem 0; }
-  .req-res label {
-    display: block; font-size: 0.7rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted);
-    margin-bottom: 0.25rem;
-  }
-  .req-res pre {
-    background: var(--code-bg); padding: 0.75rem; border-radius: 4px;
-    font-family: var(--mono); font-size: 0.8rem; overflow-x: auto;
-    white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto;
-  }
-
-  /* Feed items */
-  .feed-item {
-    border: 1px solid var(--border); border-radius: 4px;
-    padding: 0.75rem; margin: 0.5rem 0;
-  }
-  .feed-item.gated { border-left: 3px solid var(--orange); }
-  .feed-item.free { border-left: 3px solid var(--green); }
-  .feed-item h4 { font-size: 0.9rem; margin-bottom: 0.25rem; }
-  .feed-item .meta { font-size: 0.75rem; color: var(--muted); }
-  .feed-item .badge-gated {
-    background: var(--orange-light); color: var(--orange);
-    font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; font-weight: 600;
-  }
-  .feed-item .badge-free {
-    background: var(--green-light); color: var(--green);
-    font-size: 0.65rem; padding: 0.1rem 0.4rem; border-radius: 3px; font-weight: 600;
-  }
-
-  /* Content display */
-  .content-display {
-    background: #fff; border: 1px solid var(--border); border-radius: 4px;
-    padding: 1rem; margin-top: 0.5rem;
-  }
-  .content-display h3 { font-size: 1.1rem; margin-bottom: 0.5rem; }
-  .content-display .article-body { font-size: 0.9rem; line-height: 1.7; }
-
-  /* Controls */
-  .controls { padding: 1.5rem 0; text-align: center; }
-  button {
-    background: var(--accent); color: #fff; border: none;
-    padding: 0.6rem 1.5rem; border-radius: var(--radius);
-    font-size: 0.9rem; font-weight: 600; cursor: pointer;
-    transition: opacity 0.15s;
-  }
-  button:hover { opacity: 0.9; }
-  button:disabled { opacity: 0.4; cursor: not-allowed; }
-  button.secondary {
-    background: var(--code-bg); color: var(--fg); border: 1px solid var(--border);
-  }
-
-  .user-input {
-    display: flex; gap: 0.5rem; align-items: center; justify-content: center;
-    margin-bottom: 1rem; flex-wrap: wrap;
-  }
-  .user-input label { font-size: 0.85rem; font-weight: 600; }
-  .user-input input {
-    padding: 0.4rem 0.6rem; border: 1px solid var(--border); border-radius: 4px;
-    font-family: var(--mono); font-size: 0.85rem; width: 140px;
-  }
-
-  .status-bar {
-    text-align: center; padding: 0.5rem; font-size: 0.85rem;
-    color: var(--muted); font-style: italic;
-  }
-
-  /* Architecture diagram */
-  .arch {
-    font-family: var(--mono); font-size: 0.75rem; background: var(--code-bg);
-    padding: 1rem; border-radius: 4px; text-align: center; margin: 1rem 0;
-    line-height: 1.4; white-space: pre;
-  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.55 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+  header { padding: 1.5rem 1rem; border-bottom: 1px solid var(--border); }
+  header h1 { margin: 0; font-size: 1.25rem; }
+  header p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
+  main { max-width: 860px; margin: 0 auto; padding: 1rem; }
+  .step { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin: 0 0 1rem; }
+  .step > h2 { display: flex; gap: 0.6rem; align-items: center; margin: 0; padding: 0.75rem 1rem; font-size: 1rem; border-bottom: 1px solid var(--border); }
+  .step > h2 .n { width: 1.6rem; height: 1.6rem; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; background: var(--code); color: var(--muted); flex: none; }
+  .step.done > h2 .n { background: var(--accent); color: var(--bg); }
+  .step.error > h2 .n { background: var(--bad); color: var(--bg); }
+  .step > h2 .spec { margin-left: auto; font: 0.75rem var(--mono); color: var(--muted); font-weight: normal; }
+  .body { padding: 0.75rem 1rem 1rem; }
+  .step:not(.open) .body { display: none; }
+  .explain { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.75rem; }
+  pre { background: var(--code); padding: 0.75rem; border-radius: 6px; font: 0.78rem/1.5 var(--mono); overflow: auto; max-height: 320px; white-space: pre-wrap; word-break: break-word; margin: 0.5rem 0; }
+  button { font: inherit; padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); cursor: pointer; margin: 0.25rem 0.4rem 0.25rem 0; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .item { display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.4rem 0; }
+  .item.gated { border-left-color: var(--warn); } .item.free { border-left-color: var(--accent); }
+  .tag { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .gated .tag { color: var(--warn); } .free .tag { color: var(--accent); }
+  .status { display: inline-block; font: 600 0.8rem var(--mono); padding: 0.1rem 0.45rem; border-radius: 4px; }
+  .s2 { background: var(--accent-bg); color: var(--accent); } .s4 { background: var(--warn-bg); color: var(--warn); } .s5 { background: var(--bad-bg); color: var(--bad); }
+  iframe { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
+  label.inline { display: inline-flex; gap: 0.4rem; align-items: center; font-size: 0.9rem; color: var(--muted); }
+  a { color: var(--accent); }
+  .err { color: var(--bad); font-weight: 600; }
 </style>
 </head>
 <body>
-
 <header>
-  <h1>OPE Reader Demo</h1>
-  <span class="badge">SPEC v0.1</span>
-  <p>Walk through the full Open Portable Entitlement lifecycle: discover, browse, subscribe, read, refresh, revoke.</p>
+  <h1>OPE Reader</h1>
+  <p>An app reading a subscriber-only post with Open Portable Entitlement v0.2, one protocol step at a time.</p>
 </header>
+<main id="steps"></main>
 
-<div class="container">
+<script type="module">
+import { createClient, generateDpopKey, pkce, decodeJwt } from "/ope-client.js";
 
-  <div class="arch">Publisher (:8080)          Gateway (:4000)          Reader (you)
-     [blog + feed]         [grant tokens]        [this browser]
+const { publisher } = await (await fetch("/config.json")).json();
+const proxied = (url, init) => fetch("/proxy?url=" + encodeURIComponent(url), init);
+const client = createClient({ fetchPublisher: proxied });
+const redirectUri = location.origin + "/callback";
+const state = {}; // found, app, key, verifier, tokens, target
 
-  Feed ──► Discovery ──► Auth ──► Grant Token ──► Content
-                                                      </div>
+// ── Step scaffolding ──
+const STEPS = [
+  ["feed", "Read the feed", "Feeds profile"],
+  ["discover", "Ask for the post with no token", "§7, §11.4"],
+  ["register", "Register this app", "§8.2"],
+  ["authorize", "Sign in and choose", "§8.1, §8.4"],
+  ["token", "Exchange the code for a License Token", "§8.5, §9"],
+  ["read", "Read the post", "§11.2"],
+  ["stolen", "Try a copied token", "§14"],
+  ["lifecycle", "Refresh and revoke", "§12"],
+];
+const root = document.getElementById("steps");
+for (const [id, title, spec] of STEPS) {
+  root.insertAdjacentHTML("beforeend", `<section class="step" id="s-${id}"><h2><span class="n">${STEPS.findIndex((s) => s[0] === id) + 1}</span>${title}<span class="spec">${spec}</span></h2><div class="body"></div></section>`);
+}
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const json = (v) => `<pre>${esc(JSON.stringify(v, null, 2))}</pre>`;
+const status = (n) => `<span class="status s${String(n)[0]}">${n}</span>`;
+function step(id, html, { done = true, error = false } = {}) {
+  const el = document.getElementById("s-" + id);
+  el.classList.add("open");
+  el.classList.toggle("done", done && !error);
+  el.classList.toggle("error", error);
+  el.querySelector(".body").innerHTML = html;
+  return el.querySelector(".body");
+}
+function fail(id, err) { step(id, `<p class="err">${esc(err.message || err)}</p>`, { error: true }); console.error(err); }
 
-  <div class="user-input">
-    <label>User ID:</label>
-    <input type="text" id="userId" value="demo-reader">
-    <label>Grant type:</label>
-    <input type="text" id="grantType" value="subscription">
-  </div>
-
-  <div class="controls">
-    <button id="runBtn" onclick="runDemo()">Run Full Demo</button>
-    <button id="resetBtn" class="secondary" onclick="resetDemo()" style="margin-left:0.5rem" disabled>Reset</button>
-  </div>
-
-  <div id="statusBar" class="status-bar">Click "Run Full Demo" to begin.</div>
-
-  <!-- Step 1: Discovery -->
-  <div class="step" id="step1">
-    <div class="step-header">
-      <div class="step-num">1</div>
-      <div class="step-title">Discover publisher capabilities</div>
-      <div class="step-spec">GET /.well-known/ope &middot; &sect;6</div>
-    </div>
-    <div class="step-body" id="step1Body"></div>
-  </div>
-
-  <!-- Step 2: Feed -->
-  <div class="step" id="step2">
-    <div class="step-header">
-      <div class="step-num">2</div>
-      <div class="step-title">Fetch JSON Feed &amp; list items</div>
-      <div class="step-spec">GET /feed.json &middot; &sect;9</div>
-    </div>
-    <div class="step-body" id="step2Body"></div>
-  </div>
-
-  <!-- Step 3: Grant -->
-  <div class="step" id="step3">
-    <div class="step-header">
-      <div class="step-num">3</div>
-      <div class="step-title">Acquire grant token from gateway</div>
-      <div class="step-spec">POST /api/entitlement/grant &middot; &sect;8</div>
-    </div>
-    <div class="step-body" id="step3Body"></div>
-  </div>
-
-  <!-- Step 4: Content -->
-  <div class="step" id="step4">
-    <div class="step-header">
-      <div class="step-num">4</div>
-      <div class="step-title">Fetch gated content with grant token</div>
-      <div class="step-spec">GET /api/content/{id} &middot; &sect;10</div>
-    </div>
-    <div class="step-body" id="step4Body"></div>
-  </div>
-
-  <!-- Step 5: Refresh -->
-  <div class="step" id="step5">
-    <div class="step-header">
-      <div class="step-num">5</div>
-      <div class="step-title">Refresh token (rotation)</div>
-      <div class="step-spec">POST /api/entitlement/refresh &middot; &sect;12.3</div>
-    </div>
-    <div class="step-body" id="step5Body"></div>
-  </div>
-
-  <!-- Step 6: Revoke -->
-  <div class="step" id="step6">
-    <div class="step-header">
-      <div class="step-num">6</div>
-      <div class="step-title">Revoke grant token</div>
-      <div class="step-spec">POST /api/entitlement/revoke &middot; &sect;12.2</div>
-    </div>
-    <div class="step-body" id="step6Body"></div>
-  </div>
-
-</div>
-
-<script>
-let state = {};
-
-function esc(s) {
-  const el = document.createElement("span");
-  el.textContent = s;
-  return el.innerHTML;
+// ── 1. Feed ──
+async function loadFeed() {
+  const feed = await (await proxied(publisher + "/feed.json")).json();
+  const offers = (feed._ope?.offers || []).map((o) => `${esc(o.name)} ($${esc(o.payment.amount)})`).join(" · ");
+  const body = step("feed", `<p class="explain">The feed marks gated posts with <code>_ope</code> and lists what's on offer. Choose a gated post to read it in this app.</p>
+    <p><strong>${esc(feed.title)}</strong><br><span class="explain">Offers: ${offers}</span></p>
+    ${feed.items.map((item, i) => `<div class="item ${item._ope ? "gated" : "free"}"><div><span class="tag">${item._ope ? "Gated" : "Free"}</span> ${esc(item.title)}${item._ope?.offers ? ` <span class="explain">(also sold on its own)</span>` : ""}</div>
+      ${item._ope ? `<button data-i="${i}">Read</button>` : ""}</div>`).join("")}
+    <label class="inline"><input type="checkbox" id="dpop" checked> Bind the token to a DPoP key</label>`);
+  body.querySelectorAll("button[data-i]").forEach((b) => b.onclick = () => discover(feed.items[b.dataset.i]).catch((e) => fail("discover", e)));
 }
 
-function reqRes(label, method, url, body, response) {
-  let html = `<div class="req-res"><label>${esc(label)}</label><pre>`;
-  html += `${method} ${esc(url)}\n`;
-  if (body) html += `\n${esc(JSON.stringify(body, null, 2))}`;
-  html += `</pre></div>`;
-  html += `<div class="req-res"><label>Response</label><pre>${esc(JSON.stringify(response, null, 2))}</pre></div>`;
-  return html;
+// ── 2. Discovery ──
+async function discover(item) {
+  state.target = item;
+  state.useDpop = document.getElementById("dpop").checked;
+  const found = state.found = await client.discover(item.url);
+  step("discover", `<p class="explain">The publisher answers <code>402</code> with challenges naming the post's scope. The scope's metadata (RFC 9728) names the License Server; its own metadata (RFC 8414) has the endpoints.</p>
+    <p>GET ${esc(found.asset)} → ${status(found.status)}</p>
+    ${json(found.challenges)}
+    <p><strong>Resource metadata</strong> for <code>${esc(found.resourceMetadata.resource)}</code></p>${json(found.resourceMetadata)}
+    <p><strong>License Server</strong> <code>${esc(found.authServer.issuer)}</code> issues for</p>${json(found.authServer.protected_resources)}
+    <button class="primary" id="go-register">Register this app</button>`);
+  document.getElementById("go-register").onclick = () => register().catch((e) => fail("register", e));
 }
 
-function setStep(n, cls) {
-  document.getElementById(`step${n}`).className = `step ${cls}`;
+// ── 3. Registration ──
+async function register() {
+  state.app = await client.register(state.found.authServer, { clientName: "OPE Web Reader", redirectUri });
+  state.key = state.useDpop ? await generateDpopKey() : null;
+  step("register", `<p class="explain">A public client: no secret. ${state.key ? "The app also makes a DPoP key pair; the private key stays inside the browser's WebCrypto and can't be exported." : "No DPoP key: the token will be unbound."}</p>
+    ${json(state.app)}${state.key ? `<p>DPoP key thumbprint <code>${esc(state.key.jkt)}</code></p>` : ""}
+    <button class="primary" id="go-auth">Sign in at the License Server</button>`);
+  document.getElementById("go-auth").onclick = () => authorize().catch((e) => fail("authorize", e));
 }
 
-function setStatus(msg) {
-  document.getElementById("statusBar").textContent = msg;
-}
-
-async function api(url, opts = {}) {
-  const res = await fetch(url, opts);
-  const data = await res.json();
-  if (!res.ok) throw { status: res.status, data };
-  return data;
-}
-
-async function runDemo() {
-  document.getElementById("runBtn").disabled = true;
-  document.getElementById("resetBtn").disabled = true;
-  const userId = document.getElementById("userId").value || "demo-reader";
-  const grantType = document.getElementById("grantType").value || "subscription";
-  state = {};
-
-  try {
-    // Step 1: Discovery
-    setStep(1, "active"); setStatus("Discovering publisher...");
-    const discovery = await api("/proxy/discovery");
-    state.discovery = discovery;
-    let html1 = reqRes("Request", "GET", "/.well-known/ope", null, discovery);
-    html1 += `<p style="margin-top:0.5rem;font-size:0.85rem">`;
-    html1 += `<strong>Token mode:</strong> ${esc(discovery.entitlement?.token_mode)} (${esc(discovery.entitlement?.token_format)})<br>`;
-    html1 += `<strong>Content endpoint:</strong> <code>${esc(discovery.content?.endpoint_template)}</code><br>`;
-    html1 += `<strong>Grants supported:</strong> ${esc((discovery.grants_supported || []).join(", "))}<br>`;
-    if (discovery.metadata?.plans?.length) {
-      html1 += `<strong>Plans:</strong> `;
-      html1 += discovery.metadata.plans.map(p => `${esc(p.name)} $${(p.amount/100).toFixed(2)}`).join(", ");
-    }
-    html1 += `</p>`;
-    document.getElementById("step1Body").innerHTML = html1;
-    setStep(1, "done");
-
-    // Step 2: Feed
-    setStep(2, "active"); setStatus("Fetching JSON Feed...");
-    const feed = await api("/proxy/feed");
-    state.feed = feed;
-    let html2 = reqRes("Request", "GET", "/feed.json", null, { title: feed.title, items: `[${feed.items.length} items]` });
-    html2 += `<div style="margin-top:0.5rem">`;
-    for (const item of feed.items) {
-      const gated = item.extensions?.ope != null;
-      const cls = gated ? "gated" : "free";
-      const badge = gated
-        ? `<span class="badge-gated">GATED</span>`
-        : `<span class="badge-free">FREE</span>`;
-      html2 += `<div class="feed-item ${cls}">`;
-      html2 += `<h4>${badge} ${esc(item.title)}</h4>`;
-      if (gated) {
-        const meta = item.extensions.ope.content_metadata || {};
-        const parts = [];
-        if (meta.resource_type) parts.push(meta.resource_type);
-        if (meta.word_count) parts.push(`${meta.word_count} words`);
-        if (meta.estimated_read_time_minutes) parts.push(`${meta.estimated_read_time_minutes} min`);
-        html2 += `<div class="meta">${esc(parts.join(" · "))}${meta.unlock_cta ? ` · ${esc(meta.unlock_cta)}` : ""}</div>`;
-        html2 += `<div class="meta">Content ID: <code>${esc(item.extensions.ope.content_id)}</code></div>`;
-      } else {
-        const preview = (item.content_html || "").replace(/<[^>]+>/g, "").substring(0, 120);
-        html2 += `<div class="meta">${esc(preview)}...</div>`;
-      }
-      html2 += `</div>`;
-    }
-    html2 += `</div>`;
-    document.getElementById("step2Body").innerHTML = html2;
-    setStep(2, "done");
-
-    // Pick first gated item
-    const gatedItems = feed.items.filter(i => i.extensions?.ope);
-    if (gatedItems.length === 0) {
-      setStatus("No gated items found in feed."); return;
-    }
-    const target = gatedItems[0];
-    const contentId = target.extensions.ope.content_id;
-
-    // Step 3: Grant
-    setStep(3, "active"); setStatus(`Requesting ${grantType} grant for "${userId}"...`);
-    const grantBody = { user_id: userId, grant_type: grantType };
-    const grant = await api("/proxy/grant", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(grantBody),
+// ── 4. Authorization (popup) ──
+async function authorize() {
+  const { verifier, challenge } = await pkce();
+  state.verifier = verifier;
+  state.oauthState = crypto.randomUUID();
+  const url = client.authorizationUrl(state.found.authServer, {
+    clientId: state.app.client_id, redirectUri, resource: state.found.asset, codeChallenge: challenge, state: state.oauthState,
+  });
+  step("authorize", `<p class="explain">The License Server signs the person in, shows what the app is asking for, and (in this demo) offers a pretend checkout. Any name works.</p><pre>${esc(url)}</pre><p>Waiting for the sign-in window…</p>`, { done: false });
+  const popup = window.open(url, "ope-signin", "width=520,height=720");
+  if (!popup) throw new Error("The sign-in window was blocked. Allow pop-ups for this page and try again.");
+  const params = await new Promise((resolve) => {
+    window.addEventListener("message", function onMessage(e) {
+      if (e.origin !== location.origin || e.data?.ope !== "callback") return;
+      window.removeEventListener("message", onMessage);
+      resolve(e.data.params);
     });
-    state.grant = grant;
-    let html3 = reqRes("Request", "POST", "/api/entitlement/grant", grantBody, grant);
-    html3 += `<p style="margin-top:0.5rem;font-size:0.85rem">`;
-    html3 += `<strong>Grant type:</strong> ${esc(grant.grant_type)}<br>`;
-    html3 += `<strong>Scope:</strong> ${esc((grant.scope || []).join(", "))}<br>`;
-    html3 += `<strong>Expires in:</strong> ${grant.expires_in}s<br>`;
-    html3 += `<strong>Token ID:</strong> <code>${esc(grant.token_id)}</code><br>`;
-    html3 += `<strong>Refresh token:</strong> <code>${esc((grant.refresh_token || "").substring(0, 24))}...</code>`;
-    html3 += `</p>`;
-    document.getElementById("step3Body").innerHTML = html3;
-    setStep(3, "done");
-
-    // Step 4: Content
-    setStep(4, "active"); setStatus(`Fetching content: ${contentId}...`);
-    const content = await api(`/proxy/content/${encodeURIComponent(contentId)}`, {
-      headers: { Authorization: `Bearer ${grant.grant_token}` },
-    });
-    state.content = content;
-    let html4 = reqRes("Request", "GET", `/api/content/${contentId}`, null,
-      { id: content.id, title: content.title, resource_type: content.resource_type, content_html: "(full HTML)" });
-    html4 += `<div class="content-display">`;
-    html4 += `<h3>${esc(content.title)}</h3>`;
-    if (content.resource_type) html4 += `<div class="meta" style="margin-bottom:0.5rem;color:#666;font-size:0.8rem">${esc(content.resource_type)} · ${esc(content.published || "")}</div>`;
-    html4 += `<div class="article-body">${content.content_html || "<em>No HTML content</em>"}</div>`;
-    html4 += `</div>`;
-    document.getElementById("step4Body").innerHTML = html4;
-    setStep(4, "done");
-
-    // Step 5: Refresh
-    setStep(5, "active"); setStatus("Refreshing grant token (rotation)...");
-    const refreshBody = { refresh_token: grant.refresh_token };
-    const refreshed = await api("/proxy/refresh", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(refreshBody),
-    });
-    state.refreshed = refreshed;
-    let html5 = reqRes("Request", "POST", "/api/entitlement/refresh",
-      { refresh_token: `${(grant.refresh_token || "").substring(0, 20)}...` }, refreshed);
-    html5 += `<p style="margin-top:0.5rem;font-size:0.85rem">`;
-    html5 += `Old refresh token is now <strong>invalidated</strong> (rotation per spec &sect;12.3).<br>`;
-    html5 += `<strong>New token ID:</strong> <code>${esc(refreshed.token_id)}</code><br>`;
-    html5 += `<strong>New refresh token:</strong> <code>${esc((refreshed.refresh_token || "").substring(0, 24))}...</code>`;
-    html5 += `</p>`;
-    document.getElementById("step5Body").innerHTML = html5;
-    setStep(5, "done");
-
-    // Step 6: Revoke
-    setStep(6, "active"); setStatus("Revoking grant token...");
-    const revokeBody = { token: refreshed.grant_token, reason: "demo_complete" };
-    const revoked = await api("/proxy/revoke", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(revokeBody),
-    });
-    let html6 = reqRes("Request", "POST", "/api/entitlement/revoke",
-      { token: "(grant token)", reason: "demo_complete" }, revoked);
-    html6 += `<p style="margin-top:0.5rem;font-size:0.85rem">Grant token <strong>revoked</strong>. The token is cryptographically valid until expiry, but the gateway's revocation list will reject it on future use.</p>`;
-    document.getElementById("step6Body").innerHTML = html6;
-    setStep(6, "done");
-
-    setStatus("Complete! The full OPE lifecycle ran successfully.");
-  } catch (err) {
-    const stepNum = [1,2,3,4,5,6].find(n => document.getElementById(`step${n}`).classList.contains("active")) || 1;
-    setStep(stepNum, "error");
-    const detail = err.data ? JSON.stringify(err.data, null, 2) : err.message || String(err);
-    document.getElementById(`step${stepNum}Body`).innerHTML =
-      `<div class="req-res"><label>Error</label><pre style="color:var(--red)">${esc(detail)}</pre></div>
-       <p style="margin-top:0.5rem;font-size:0.85rem;color:var(--red)">Make sure the publisher (port 8080) and gateway (port 4000) are running.</p>`;
-    setStatus("Error: see the failed step above.");
-  }
-
-  document.getElementById("runBtn").disabled = false;
-  document.getElementById("resetBtn").disabled = false;
+  });
+  if (params.error) throw new Error(`${params.error}: ${params.error_description || ""}`);
+  if (params.state !== state.oauthState) throw new Error("state mismatch");
+  if (params.iss !== state.found.authServer.issuer) throw new Error("iss mismatch (RFC 9207)");
+  step("authorize", `<p class="explain">The License Server redirected back with a one-time code. <code>state</code> and <code>iss</code> match.</p>${json(params)}`);
+  await exchange(params.code);
 }
 
-function resetDemo() {
-  for (let i = 1; i <= 6; i++) {
-    document.getElementById(`step${i}`).className = "step";
-    document.getElementById(`step${i}Body`).innerHTML = "";
-  }
-  state = {};
-  setStatus('Click "Run Full Demo" to begin.');
+// ── 5. Token ──
+async function exchange(code) {
+  const as = state.found.authServer;
+  state.tokens = await client.exchangeCode(as, {
+    clientId: state.app.client_id, code, redirectUri, codeVerifier: state.verifier, resource: state.found.asset,
+  }, state.key);
+  showToken("token", "The token says who issued it, which publisher and URLs it covers, what kind of Entitlement it carries, and (if bound) which key must sign each request. The subject is opaque: the publisher never learns the person's name.");
+  await read();
 }
+function showToken(id, explain) {
+  const t = state.tokens;
+  const header = JSON.parse(atob(t.access_token.split(".")[0].replace(/-/g, "+").replace(/_/g, "/")));
+  step(id, `<p class="explain">${explain}</p>
+    <p><code>token_type</code> ${esc(t.token_type)} · covers <code>${esc(t.resource)}</code> · expires in ${t.expires_in}s</p>
+    <p><strong>Header</strong></p>${json(header)}<p><strong>Claims</strong></p>${json(decodeJwt(t.access_token))}`);
+}
+
+// ── 6. Read ──
+async function read() {
+  const r = await client.fetchAsset(state.target.url, state.tokens, state.key);
+  const body = step("read", `<p class="explain">The app asks for the post at its own URL with <code>Authorization: ${esc(state.tokens.token_type)} …</code>${state.key ? " and a fresh DPoP proof" : ""}. The publisher checks the signature, coverage, Entitlement, key, and revocation.</p>
+    <p>GET ${esc(state.target.url)} → ${status(r.status)}</p>
+    ${r.ok ? `<iframe sandbox title="Post content"></iframe>` : json(r.challenges)}
+    <p><button class="primary" id="go-stolen" ${state.key ? "" : "disabled"}>Try a copied token</button><button id="go-lifecycle">Refresh and revoke</button></p>`, { error: !r.ok });
+  if (r.ok) body.querySelector("iframe").srcdoc = r.body.content_html;
+  document.getElementById("go-stolen").onclick = () => stolen().catch((e) => fail("stolen", e));
+  document.getElementById("go-lifecycle").onclick = () => lifecycle().catch((e) => fail("lifecycle", e));
+}
+
+// ── 7. A copied token ──
+async function stolen() {
+  const thief = await generateDpopKey();
+  const a = await client.fetchAsset(state.target.url, state.tokens, thief);
+  const b = await client.fetchAsset(state.target.url, { ...state.tokens, token_type: "License" }, null);
+  step("stolen", `<p class="explain">Someone who copies a DPoP-bound token can't use it: every request needs a proof signed by the app's private key.</p>
+    <p>With another key's proof → ${status(a.status)} <code>${esc(a.challenges[0]?.params.error_description)}</code></p>
+    <p>As a License-scheme token → ${status(b.status)} <code>${esc(b.challenges[0]?.params.error_description)}</code></p>`);
+}
+
+// ── 8. Refresh and revoke ──
+async function lifecycle() {
+  const as = state.found.authServer;
+  const body = step("lifecycle", `<p class="explain">Tokens last an hour. Refreshing returns a new refresh token and spends the old one; if a spent one ever comes back, the License Server ends the whole authorization. Revoking stops the token at the publisher right away, because the publisher checks with the License Server.</p>
+    <button id="do-refresh">Refresh</button><button id="do-revoke">Revoke</button>
+    <a href="${esc(as.issuer)}/account" target="_blank" rel="noopener">Manage subscriptions and apps at the License Server</a>
+    <div id="lifecycle-out"></div>`);
+  const out = body.querySelector("#lifecycle-out");
+  body.querySelector("#do-refresh").onclick = async () => {
+    try {
+      state.tokens = await client.refresh(as, { clientId: state.app.client_id, refreshToken: state.tokens.refresh_token }, state.key);
+      const r = await client.fetchAsset(state.target.url, state.tokens, state.key);
+      out.innerHTML = `<p>Refreshed. New token reads the post → ${status(r.status)}</p>${json(decodeJwt(state.tokens.access_token))}`;
+    } catch (e) { out.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
+  };
+  body.querySelector("#do-revoke").onclick = async () => {
+    await client.revoke(as, { clientId: state.app.client_id, token: state.tokens.refresh_token });
+    const r = await client.fetchAsset(state.target.url, state.tokens, state.key);
+    out.innerHTML = `<p>Revoked. The same access token now gets ${status(r.status)} <code>${esc(r.challenges[0]?.params.error_description)}</code></p>`;
+  };
+}
+
+loadFeed().catch((e) => fail("feed", e));
 </script>
-
 </body>
 </html>
