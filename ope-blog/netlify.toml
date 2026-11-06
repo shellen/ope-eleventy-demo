@@ -1,19 +1,16 @@
+# Hosted deploy of the OPE v0.2 demo publisher. The plugin writes _redirects, which
+# send each gated post's URL to functions/ope.mjs.
 [build]
   command = "npx @11ty/eleventy"
   publish = "_site"
   functions = "functions"
 
 [functions]
+  # esbuild bundles .ope/content.json into the function (it's imported there),
+  # so the full posts are never part of the published site.
   node_bundler = "esbuild"
-  included_files = ["_site/api/content/_store.json"]
 
-# Route /api/content/* to the serverless function
-[[redirects]]
-  from = "/api/content/*"
-  to = "/.netlify/functions/content"
-  status = 200
-
-# Ensure .well-known files are served correctly
+# OAuth metadata: JSON, readable from any origin
 [[headers]]
   for = "/.well-known/*"
   [headers.values]

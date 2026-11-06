@@ -1,7 +1,7 @@
 {
   "name": "ope-reader",
-  "version": "0.1.0",
-  "description": "Minimal OPE reader demo: discovers feeds, acquires grants, fetches gated content",
+  "version": "0.2.0",
+  "description": "OPE v0.2 reader demo: a CLI and a browser app that discover, authorize, and read gated posts with DPoP-bound License Tokens",
   "type": "module",
   "scripts": {
     "start": "node reader.js",

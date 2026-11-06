@@ -2,36 +2,33 @@
 permalink: feed.json
 eleventyExcludeFromCollections: true
 ---
-{%- set siteUrl = ope.siteUrl -%}
+{#- ABOUTME: JSON Feed 1.1 with OPE v0.2 extensions (Feeds profile): Offers once at feed level, gated items marked. -#}
+{%- set scope = ope.scopes[0] -%}
 {
   "version": "https://jsonfeed.org/version/1.1",
-  "title": "{{ ope.publisherName }}",
-  "home_page_url": "{{ siteUrl }}",
-  "feed_url": "{{ siteUrl }}/feed.json",
+  "title": {{ ope.publisherName | dump | safe }},
+  "home_page_url": "{{ ope.siteUrl }}/",
+  "feed_url": "{{ ope.siteUrl }}/feed.json",
+  "_ope": {
+    "about": "https://feedspec.org/ope/ns/0.2",
+    "resource": "{{ scope.scope }}",
+    "offers": {{ scope.offers | opeJson | safe }}
+  },
   "items": [
     {%- for post in collections.post | reverse %}
     {
-      "id": "{{ post.data.ope_content_id | default(post.fileSlug) }}",
-      "url": "{{ siteUrl }}{{ post.url }}",
-      "title": "{{ post.data.title }}",
+      "id": "{{ post.url | opeAbsolute }}",
+      "url": "{{ post.url | opeAbsolute }}",
+      "title": {{ post.data.title | dump | safe }},
       {%- if post.data.ope_gated %}
+      "summary": {{ post.content | opePreview(280) | dump | safe }},
       "content_text": {{ post.content | opePreview(280) | dump | safe }},
-      "extensions": {
-        "ope": {
-          "required": { "level": "{{ post.data.ope_level | default('subscriber') }}" },
-          "grants_allowed": {{ post.data.ope_grants | default(["subscription", "gift"]) | dump | safe }},
-          "content_id": "{{ post.data.ope_content_id | default(post.fileSlug) }}",
-          "content_metadata": {
-            "resource_type": "{{ post.data.ope_resource_type | default('article') }}",
-            "word_count": {{ post.content | opeWordCount }},
-            "estimated_read_time_minutes": {{ post.content | opeReadTime }},
-            "unlock_cta": "{{ post.data.ope_cta | default('Subscribe to read the full post') }}",
-            "unlock_url": "{{ siteUrl }}{{ post.url }}?ope_unlock=1"{{ "," if post.data.ope_per_item_price }}
-            {%- if post.data.ope_per_item_price %}
-            "per_item_price": {{ post.data.ope_per_item_price | dump | safe }}
-            {%- endif %}
-          }
-        }
+      "_ope": {
+        "resource": "{{ post.url | opeAbsolute }}"
+        {%- if post.data.ope_offers %},
+        "metadata": "{{ ope.siteUrl }}/.well-known/oauth-protected-resource{{ post.url }}",
+        "offers": {{ post | opeItemOffers | opeJson | safe }}
+        {%- endif %}
       },
       {%- else %}
       "content_html": {{ post.content | dump | safe }},

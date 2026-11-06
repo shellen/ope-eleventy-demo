@@ -4,15 +4,7 @@ date: 2026-03-27
 ope_gated: true
 ope_content_id: podcast-open-feeds
 ope_resource_type: podcast_episode
-ope_level: subscriber
 ope_cta: "Subscribe for ad-free episodes and bonus content"
-ope_grants:
-  - subscription
-  - ad_supported
-  - per_item
-ope_per_item_price:
-  currency: USD
-  amount: 200
 ---
 
 A preview of Episode 1: Jason Shellen talks about the past, present, and future of feed-based publishing, from the early days of RSS at Blogger to the emergence of portable entitlements.

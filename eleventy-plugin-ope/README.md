@@ -1,251 +1,155 @@
 # eleventy-plugin-ope
 
-An Eleventy plugin that adds [Open Portable Entitlement (OPE)](https://feedspec.org) support to any Eleventy blog. Aligned with **OPE spec v0.1**.
+Add [Open Portable Entitlement v0.2](https://feedspec.org/ope/spec/0.2/) to an Eleventy site: subscriber-only posts that readers can unlock in any OPE app, with a License Server of your choosing handling accounts and payment.
 
-Drop it into a new or existing Eleventy site to get:
+The plugin does two jobs:
 
-- **Global `ope` data**: `siteUrl`, `publisherName`, `plans`, `grantsSupported`, `brokerSupport`, etc. available in all templates
-- **Feed filters**: `opePreview`, `opeWordCount`, `opeReadTime`, `jsonEscape` for building OPE-extended feeds
-- **JWT helpers**: `createGrant` and `verifyGrant` for your serverless content API, supporting all 14 grant types
+- **At build time** it publishes what apps read to find out how to get access: OAuth Protected Resource metadata (RFC 9728), your Offers in the feed, and the routing for gated posts.
+- **At request time** it serves gated posts: a preview and a `402` without a valid token, the full post with one. It runs as a Netlify Function or as Express middleware.
 
-## Install
+## Setup: four steps
+
+**1. Install**
 
 ```bash
-npm install eleventy-plugin-ope
+npm install eleventy-plugin-ope       # requires @11ty/eleventy 3.x
 ```
 
-> **Peer dependency:** requires `@11ty/eleventy` >= 2.0.
-
-## Add to your Eleventy config
+**2. Describe what you sell** in `ope.config.js`:
 
 ```js
-// eleventy.config.js (or .eleventy.js)
-const opePlugin = require("eleventy-plugin-ope");
+const siteUrl = (process.env.OPE_SITE_URL || process.env.URL || "http://localhost:8080").replace(/\/$/, "");
 
-module.exports = function (eleventyConfig) {
-  eleventyConfig.addPlugin(opePlugin, {
-    siteUrl: "https://yourblog.com",
-    publisherName: "Your Blog",
-    publisherId: "did:web:yourblog.com",   // optional, defaults to siteUrl
-    subscribeUrl: "/subscribe/",           // optional
-    plans: [
-      { id: "monthly", name: "Monthly", currency: "USD", amount: 500 },
-      { id: "annual",  name: "Annual",  currency: "USD", amount: 5000 },
-    ],
-    grantsSupported: ["subscription", "gift", "per_item", "metered", "trial"],
-    brokerSupport: false,                  // spec §6: broker_support field
-    defaultTtl: 3600,                      // token TTL in seconds
-    maxTtl: 86400,                         // max allowed TTL (spec §6)
-    // jwtSecret defaults to process.env.OPE_JWT_SECRET
-  });
-
-  // ... rest of your config
+export default {
+  siteUrl,
+  publisherName: "Your Blog",
+  publisher: `${siteUrl}/`,                                  // spec §5.8
+  licenseServers: [process.env.OPE_LICENSE_SERVER],          // who may issue access (spec §7.1)
+  terms: { url: `${siteUrl}/terms/`, type: "text/html" },    // spec §6.1
+  scopes: [
+    {
+      scope: `${siteUrl}/posts/`,                            // covers every post under it (spec §5.5)
+      offers: [
+        {
+          id: "monthly",
+          name: "Your Blog, monthly",
+          payment: { type: "subscription", amount: "5.00", currency: "USD", period: "P1M" },
+          purchase_url: `${siteUrl}/subscribe/`,
+          entitlement_types: ["access"],
+        },
+      ],
+    },
+  ],
+  fullLayout: "post.njk",             // the layout full posts are rendered with
+  netlify: { functionName: "ope" },   // write _redirects for Netlify (leave out elsewhere)
 };
 ```
 
-## Configuration options
+On Netlify, `URL` is your site's address, so `OPE_SITE_URL` is only needed to override it.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `siteUrl` | string | `"https://example.com"` | Your site's public URL |
-| `publisherName` | string | `"My Blog"` | Display name for the publisher |
-| `publisherId` | string | `siteUrl` | Publisher identifier (DID or URL) |
-| `jwtSecret` | string | `process.env.OPE_JWT_SECRET` | Secret for signing JWTs |
-| `defaultTtl` | number | `3600` | Default token TTL in seconds |
-| `maxTtl` | number | `86400` | Maximum allowed TTL (spec §6) |
-| `subscribeUrl` | string | `siteUrl + "/subscribe"` | Subscribe page URL |
-| `plans` | array | `[]` | Subscription plans (spec §6 metadata) |
-| `grantsSupported` | array | `["subscription", "gift", "per_item"]` | Supported grant types |
-| `brokerSupport` | boolean | `false` | Whether this publisher accepts broker tokens (spec §6) |
+**3. Add the plugin** in `eleventy.config.js`, and mark posts as gated:
 
-## Templates
+```js
+import opePlugin from "eleventy-plugin-ope";
+import opeConfig from "./ope.config.js";
 
-Once the plugin is registered, a global `ope` object is available in all Nunjucks, Liquid, and JavaScript templates:
-
-```njk
-{{ ope.publisherName }}
-{{ ope.siteUrl }}
-{{ ope.subscribeUrl }}
-{{ ope.brokerSupport }}
-{{ ope.plans | dump }}
-```
-
-### OPE-extended JSON Feed (`src/feed.njk`)
-
-```njk
----
-permalink: feed.json
-eleventyExcludeFromCollections: true
----
-{%- set siteUrl = ope.siteUrl -%}
-{
-  "version": "https://jsonfeed.org/version/1.1",
-  "title": "{{ ope.publisherName }}",
-  "home_page_url": "{{ siteUrl }}",
-  "feed_url": "{{ siteUrl }}/feed.json",
-  "items": [
-    {%- for post in collections.post | reverse %}
-    {
-      "id": "{{ post.data.ope_content_id | default(post.fileSlug) }}",
-      "url": "{{ siteUrl }}{{ post.url }}",
-      "title": "{{ post.data.title }}",
-      {%- if post.data.ope_gated %}
-      "content_text": {{ post.content | opePreview(280) | dump | safe }},
-      "extensions": {
-        "ope": {
-          "required": { "level": "{{ post.data.ope_level | default('subscriber') }}" },
-          "grants_allowed": {{ post.data.ope_grants | default(["subscription", "gift"]) | dump | safe }},
-          "content_id": "{{ post.data.ope_content_id | default(post.fileSlug) }}",
-          "content_metadata": {
-            "resource_type": "{{ post.data.ope_resource_type | default('article') }}",
-            "word_count": {{ post.content | opeWordCount }},
-            "estimated_read_time_minutes": {{ post.content | opeReadTime }},
-            "unlock_cta": "{{ post.data.ope_cta | default('Subscribe to read the full post') }}",
-            "unlock_url": "{{ siteUrl }}{{ post.url }}?ope_unlock=1"
-          }
-        }
-      },
-      {%- else %}
-      "content_html": {{ post.content | dump | safe }},
-      {%- endif %}
-      "date_published": "{{ post.date.toISOString() }}"
-    }{{ "," if not loop.last }}
-    {%- endfor %}
-  ]
+export default function (eleventyConfig) {
+  eleventyConfig.addPlugin(opePlugin, opeConfig);
 }
 ```
-
-### OPE discovery endpoint (`src/well-known-ope.njk`)
-
-```njk
----
-permalink: .well-known/ope
-eleventyExcludeFromCollections: true
----
-{
-  "version": "0.1",
-  "entitlement": {
-    "grant_url": "{{ ope.siteUrl }}/api/entitlement/grant",
-    "refresh_url": "{{ ope.siteUrl }}/api/entitlement/refresh",
-    "revocation_url": "{{ ope.siteUrl }}/api/entitlement/revoke",
-    "token_format": "jwt",
-    "token_mode": "simple",
-    "default_ttl_seconds": {{ ope.defaultTtl }},
-    "max_ttl_seconds": {{ ope.maxTtl }}
-  },
-  "content": {
-    "endpoint_template": "{{ ope.siteUrl }}/api/content/{id}",
-    "batch_endpoint": "{{ ope.siteUrl }}/api/content/batch",
-    "formats_available": ["html"]
-  },
-  "metadata": {
-    "subscribe_url": "{{ ope.subscribeUrl }}",
-    "plans": {{ ope.plans | dump | safe }}
-  },
-  "grants_supported": {{ ope.grantsSupported | dump | safe }},
-  "broker_support": {{ ope.brokerSupport }}
-}
-```
-
-## Gate a post
-
-Add OPE frontmatter to any post:
 
 ```yaml
 ---
-title: My Premium Post
-date: 2026-01-01
+title: A subscriber-only post
 ope_gated: true
-ope_content_id: my-premium-post
-ope_resource_type: article
-ope_level: subscriber
-ope_cta: "Subscribe for $5/month to read the full post"
-ope_grants:
-  - subscription
-  - gift
-  - per_item
-ope_per_item_price:
-  currency: USD
-  amount: 200
 ---
 ```
 
-### Frontmatter fields
+In your post layout, show a preview when `ope_gated` is set and `ope_unlocked` isn't. The plugin renders each gated post a second time with `ope_unlocked: true`, which becomes the full version:
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `ope_gated` | boolean | yes | Whether the post is gated |
-| `ope_content_id` | string | yes | Unique content identifier |
-| `ope_resource_type` | string | no | Resource type: `article`, `essay`, `newsletter`, `podcast_episode`, `video`, etc. (default: `article`) |
-| `ope_level` | string | no | Required access level (default: `subscriber`) |
-| `ope_cta` | string | no | Call-to-action for unentitled users |
-| `ope_grants` | string[] | no | Allowed grant types (default: `["subscription", "gift"]`) |
-| `ope_per_item_price` | object | no | Per-item price: `{ currency: "USD", amount: 200 }` (amount in smallest unit) |
-
-The plugin filters handle preview extraction, word counts, and read-time estimates automatically.
-
-## JWT helpers (for serverless functions)
-
-```js
-const { createGrant, verifyGrant, GRANT_TYPES } = require("eleventy-plugin-ope");
-
-const secret = process.env.OPE_JWT_SECRET;
-
-// Create a subscription grant
-const token = createGrant(secret, "https://yourblog.com", "user-123", "subscription", {
-  ttl: 3600,
-});
-
-// Create a per-item grant scoped to specific content
-const perItem = createGrant(secret, "https://yourblog.com", "user-456", "per_item", {
-  contentIds: ["post-123", "post-456"],
-  ttl: 3600,
-});
-
-// Create a trial grant
-const trial = createGrant(secret, "https://yourblog.com", "user-789", "trial", {
-  trialExpiresAt: Math.floor(Date.now() / 1000) + 7 * 86400, // 7-day trial
-});
-
-// Verify a grant token
-const payload = verifyGrant(secret, token);
-// → { iss, sub, scope, grant_type, iat, exp, jti, ... } or null
+```njk
+{% if ope_gated and not ope_unlocked %}
+  <p>{{ content | opePreview(400) }}</p>
+  <a href="/subscribe/">Subscribe to read the rest</a>
+{% else %}
+  {{ content | safe }}
+{% endif %}
 ```
 
-### Grant options
+**4. Serve gated posts.** On Netlify, add `functions/ope.mjs`, with `functions = "functions"` under `[build]` in `netlify.toml`. The imports are relative to the function file:
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `ttl` | number | Token lifetime in seconds (default: 3600, max: 86400) |
-| `scope` | string[] | OAuth scopes (default: `["content:read"]`) |
-| `contentIds` | string[] | Content IDs for `per_item`, `rental`, `bundle` grants |
-| `meterRemaining` | number | Articles remaining for `metered` grants |
-| `institutionalDomain` | string | Domain for `institutional` grants |
-| `brokerId` | string | Broker identifier for `broker` grants |
-| `trialExpiresAt` | number | Unix timestamp when trial ends for `trial` grants |
-| `rentalExpiresAt` | number | Unix timestamp when rental ends for `rental` grants |
-| `bundleId` | string | Bundle identifier for `bundle` grants |
-| `groupId` | string | Household/group ID for `family` grants |
-| `adFree` | boolean | Ad-free flag for `ad_supported` grants |
+```js
+import { netlifyHandler } from "eleventy-plugin-ope/netlify";
+import config from "../ope.config.js";
+import content from "../.ope/content.json" with { type: "json" };
 
-### Supported grant types (spec §21)
+export const handler = netlifyHandler(config, content);
+```
 
-`subscription`, `per_item`, `gift`, `institutional`, `metered`, `locale_free`, `patronage`, `broker`, `trial`, `rental`, `bundle`, `ad_supported`, `early_access`, `family`
+Then set `OPE_LICENSE_SERVER` in Netlify's environment variables. With Express instead:
 
-## Environment variables
+```js
+import { opeMiddleware } from "eleventy-plugin-ope/express";
+app.use(opeMiddleware(config));      // before express.static("_site")
+```
 
-| Variable | Description |
-|----------|-------------|
-| `OPE_JWT_SECRET` | Secret key for signing and verifying grant tokens. **Required in production.** |
+That's all a publisher writes. Optionally, set `OPE_RS_CLIENT_SECRET` (and `OPE_RS_CLIENT_ID`) to the introspection credential your License Server gives you. Revocation then takes effect at once instead of when the token expires, within the hour.
 
-## Full working example
+## Where full posts live
 
-See [`ope-blog/`](../ope-blog) for a complete Eleventy demo blog, and [`ope-reader/`](../ope-reader) for a browser-based demo that walks through the full OPE lifecycle.
+Full posts are never part of the published site. The plugin renders them during the build, moves them with their previews into `.ope/content.json`, and deletes them from the output folder. That file is bundled into the Netlify Function, or read by the Express middleware. A static host has nothing secret to serve, however a request path is spelled. Add `.ope/` to `.gitignore`.
 
-## Spec
+## Selling a single post too
 
-[Open Portable Entitlement specification v0.1](https://feedspec.org/ope)
+```yaml
+---
+ope_gated: true
+ope_offers:                   # added to the scope's Offers for this post
+  - id: "item-this-post"
+    name: "This post only"
+    payment: { type: "purchase", amount: "2.00", currency: "USD" }
+    purchase_url: "/subscribe/"
+    entitlement_types: ["access"]
+---
+```
 
-## License
+The plugin writes per-URL metadata for that post, and its `402` challenge points apps there with `resource_metadata` (spec §7.1).
 
-MIT
+## What the build writes
+
+| Path | Contents |
+|---|---|
+| `/.well-known/oauth-protected-resource/<scope path>` | Scope metadata, one document per scope (RFC 9728 §3.1 placement) |
+| `/.well-known/oauth-protected-resource/<post path>` | Per-URL metadata, only for posts with `ope_offers` |
+| `/_redirects` | With `netlify` set: each gated post's URL → the function |
+| `.ope/content.json` | Outside the site: full posts, previews, titles, per-URL metadata paths |
+
+Each metadata document is written as a folder `index.html`, so static hosts serve it at the slashless URL. Serve `/.well-known/*` as `application/json` with `Access-Control-Allow-Origin: *`; see the demo's `netlify.toml`.
+
+## What the request-time code checks
+
+Every request for a gated post, in spec order:
+
+1. **Normalize the path** (spec §5.3). Refuse `%2F` and `%5C` (`400`), decode unreserved characters, and resolve dot-segments.
+2. **No token, or a `Bearer` token:** `402`, with a challenge carrying `ope_scope` (or `resource_metadata`), and the preview page as the body.
+3. **Check the signature and claims.** ES256 with the License Server's keys, refetched at least every 5 minutes. Also `typ: license+jwt`, an issuer your metadata lists, `aud`, and `exp`.
+4. **Check coverage:** the token's `resource` and `coverage` include this post, and `publisher` is you.
+5. **Check the Entitlement:** `access` or `limit`, and a rental that hasn't ended.
+6. **Check the DPoP proof** for a key-bound token.
+7. **Check revocation** with the License Server's `/introspect`, when the token has more than `OPE_TOLERANCE_SECONDS` (default 300) left and you've set a credential.
+
+Then it serves the full post, or JSON (`url`, `title`, `content_html`, `subject`) to apps that ask for `application/json`.
+
+## For templates
+
+- Global data `ope`: your config plus `version: "0.2"`.
+- Collections: `opeGated` and `opeItemOffers`.
+- Filters: `opeJson`, `opeAbsolute`, `opeItemOffers(post)`, `opePreview(content, chars)`, `opeWordCount`, `opeReadTime`.
+
+## Lower-level exports
+
+```js
+import { createHandler, loadContent, normalizePath } from "eleventy-plugin-ope/serve";   // adapt to any host
+import { createGate } from "eleventy-plugin-ope/gate";                                   // just the §11.2 checks
+const { scopeMetadata, itemMetadata, scopeFor, metadataPath } = require("eleventy-plugin-ope");
+```
