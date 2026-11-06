@@ -1,5 +1,5 @@
 // ABOUTME: OPE v0.2 Resource Server checks (spec §11.2), independent of any web framework.
-// ABOUTME: The Express server and the Netlify function both call check() before serving a gated post.
+// ABOUTME: serve.mjs calls check() for every gated request; adapters wrap serve.mjs for Express and Netlify.
 
 import {
   jwtVerify,

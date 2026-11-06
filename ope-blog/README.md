@@ -18,9 +18,8 @@ For the full flow (License Server and reader apps too), run `../run-demo.sh`.
 ope.config.js          Scope, Offers, Terms, and which License Servers may issue (one source of truth)
 src/posts/*.md         Posts. ope_gated: true gates one; ope_offers adds Offers of its own
 eleventy.config.js     Adds eleventy-plugin-ope with ope.config.js
-lib/ope-gate.js        The Resource Server checks (spec §11.2), framework-independent
-server.js              Local server: URL normalization, then the gate, then static files
-functions/gate.js      The same gate as a Netlify function
+server.js              Local server: the plugin's Express middleware, then static files
+functions/ope.mjs      The Netlify Function: three imports and one line, from the plugin
 ```
 
 The build writes:
@@ -31,8 +30,8 @@ The build writes:
 | `/.well-known/oauth-protected-resource/posts/004-building-for-readers/` | Per-URL metadata for the post that's also sold on its own |
 | `/feed.json` | JSON Feed with `_ope` blocks: channel Offers, and each gated item's `resource` |
 | `/posts/<slug>/` | For gated posts, the preview page |
-| `/_ope/full/posts/<slug>/` | The full post. Never served directly; the gate reads it |
-| `/_ope/gated.json` | Which paths are gated, read by the servers |
+| `/_redirects` | Sends each gated post's URL to `functions/ope.mjs` on Netlify |
+| `.ope/content.json` | Outside `_site`: full posts and previews, read by the server or bundled into the function |
 | `/terms/` | The Terms. Tokens carry its SHA-256 digest |
 
 ## Gating a post
@@ -52,9 +51,9 @@ ope_offers:                     # optional: Offers for this post on top of the s
 
 ## The checks
 
-`lib/ope-gate.js` runs on every request for a gated path, in spec order:
+The plugin's request-time code (`eleventy-plugin-ope/serve.mjs` and `gate.mjs`) runs on every request for a gated path, in spec order:
 
-1. Refuse `%2F` and `%5C` in the path (`400`). `server.js` also resolves dot-segments and decodes unreserved characters first, so `/posts/x/../../_ope/full/…` can't reach a full post.
+1. Refuse `%2F` and `%5C` in the path (`400`), then resolve dot-segments and decode unreserved characters. Full posts aren't in `_site` at all, so no spelling of a path can reach one.
 2. No token, or a `Bearer` token: `402` with a challenge for each scheme. The challenge carries `ope_scope`, or `resource_metadata` for a post with its own metadata.
 3. Signature (ES256, keys from the License Server's JWKS, refetched at least every 5 minutes), `typ: license+jwt`, an issuer listed in our metadata, `aud`, `exp`.
 4. Coverage: the token's `resource` and `coverage` include this post, and `publisher` is this site (`403 insufficient_scope`).
@@ -78,4 +77,4 @@ The spec requires `https` Asset identifiers (§5.2). The local demo uses `http:/
 
 ## Netlify
 
-`netlify.toml`, `src/_redirects.njk` (routes each gated post to `functions/gate.js` and blocks `/_ope/*`), and the function are ready. The hosted demo stays on the `v0.1` branch until a License Server is hosted too. To deploy this version, set `OPE_SITE_URL`, `OPE_LICENSE_SERVER`, and `OPE_RS_CLIENT_SECRET` in Netlify's environment, with the base directory `ope-blog`.
+`netlify.toml`, the plugin's generated `_redirects`, and `functions/ope.mjs` are ready. Deploy with base directory `ope-blog` and set `OPE_LICENSE_SERVER`, plus `OPE_RS_CLIENT_SECRET` for immediate revocation. The site's address comes from Netlify's `URL` unless `OPE_SITE_URL` is set. `npm install` also installs the plugin's own dependencies (the `postinstall` script), since the demo links the plugin from `../eleventy-plugin-ope` rather than from npm.

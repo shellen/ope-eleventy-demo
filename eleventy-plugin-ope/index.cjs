@@ -1,7 +1,11 @@
 // ABOUTME: Eleventy plugin for OPE v0.2: generates OAuth Protected Resource metadata and feed Offers.
 // ABOUTME: Spec: https://feedspec.org/ope/spec/0.2/ (discovery §7.1, Offers §6.2, Feeds profile).
 
+const fs = require("node:fs");
+const path = require("node:path");
+
 const OPE_VERSION = "0.2";
+const FULL_DIR = "/_ope"; // rendered here during the build, then moved out of the site
 
 // ── Metadata builders (spec §7.1) ───────────────────────────────────
 // Exported so servers and tests build the same documents the site publishes.
@@ -119,21 +123,71 @@ module.exports = function opePlugin(eleventyConfig, config) {
     },
   );
 
-  // Index of gated posts, read by the publisher's server to know what to gate.
+  // Full versions of gated posts, rendered with the site's own layout. ope_unlocked
+  // tells the layout to show the whole post; ope_post is the original post.
+  eleventyConfig.addTemplate(
+    "ope-full.11ty.js",
+    {
+      data: {
+        layout: config.fullLayout || "post.njk",
+        pagination: { data: "collections.opeGated", size: 1, alias: "ope_post" },
+        permalink: (data) => `${FULL_DIR}${data.ope_post.url}index.html`,
+        eleventyExcludeFromCollections: true,
+        ope_unlocked: true,
+        eleventyComputed: { title: (data) => data.ope_post.data.title },
+      },
+      render: (data) => data.ope_post.content,
+    },
+  );
+
+  // Index of gated posts, gathered with the full and preview pages after the build.
   eleventyConfig.addTemplate(
     "ope-gated-index.11ty.js",
     {
       render: (data) => JSON.stringify(
         Object.fromEntries((data.collections.opeGated || []).map((post) => [post.url, {
           title: post.data.title,
-          full: `/_ope/full${post.url}index.html`,
-          preview: `${post.url}index.html`,
           // Posts with Offers of their own have per-URL metadata; challenges point to it.
           ...(post.data.ope_offers ? { metadata: metadataPath(absolute(post.url)) } : {}),
-        }])), null, 2),
+        }]))),
     },
-    { permalink: "/_ope/gated.json", eleventyExcludeFromCollections: true },
+    { permalink: `${FULL_DIR}/gated.json`, eleventyExcludeFromCollections: true },
   );
+
+  // Netlify: send each gated post's URL to the OPE function. Off unless asked for,
+  // since a site may already have its own _redirects.
+  if (config.netlify) {
+    const fn = config.netlify.functionName || "ope";
+    eleventyConfig.addTemplate(
+      "ope-redirects.11ty.js",
+      {
+        render: (data) => (data.collections.opeGated || [])
+          .map((post) => `${post.url}  /.netlify/functions/${fn}  200!`).join("\n") + "\n",
+      },
+      { permalink: "/_redirects", eleventyExcludeFromCollections: true },
+    );
+  }
+
+  // After the build, move the full posts out of the published site into one
+  // content file, with each post's preview. Nothing secret is left for a static
+  // host to serve, however a request path is spelled.
+  eleventyConfig.on("eleventy.after", ({ dir, results }) => {
+    const byUrl = new Map(results.map((r) => [r.url, r]));
+    const indexResult = byUrl.get(`${FULL_DIR}/gated.json`);
+    if (!indexResult) return; // an incremental build that didn't touch gated posts
+    const index = JSON.parse(indexResult.content);
+    const posts = {};
+    for (const [url, entry] of Object.entries(index)) {
+      const full = byUrl.get(`${FULL_DIR}${url}`);
+      const preview = byUrl.get(url);
+      if (!full || !preview) throw new Error(`eleventy-plugin-ope: missing rendered page for ${url}`);
+      posts[url] = { ...entry, full: full.content, preview: preview.content };
+    }
+    const file = path.resolve(config.contentFile || process.env.OPE_CONTENT_FILE || ".ope/content.json");
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify({ version: OPE_VERSION, siteUrl: config.siteUrl, posts }));
+    fs.rmSync(path.join(dir.output, FULL_DIR), { recursive: true, force: true });
+  });
 };
 
 module.exports.OPE_VERSION = OPE_VERSION;

@@ -66,13 +66,13 @@ The steps match [Appendix B](https://feedspec.org/ope/spec/0.2/#appendix-b-imple
 
 ## The parts
 
-**[ope-blog](./ope-blog/)**: An Eleventy blog with one scope (`/posts/`) and two subscription Offers. One post is also sold on its own, so it gets per-URL metadata. A gated post's URL serves a preview with a `402` until a request carries a valid token, then serves the full post. The checks (spec §11.2) live in `lib/ope-gate.js` and are shared by the local Express server and a Netlify function.
+**[ope-blog](./ope-blog/)**: An Eleventy blog with one scope (`/posts/`) and two subscription Offers. One post is also sold on its own, so it gets per-URL metadata. A gated post's URL serves a preview with a `402` until a request carries a valid token, then serves the full post. The blog itself has almost no OPE code: a config file, one plugin line, and a three-line Netlify Function. The checks live in the plugin.
 
 **[ope-license-server](./ope-license-server/)**: One readable file. Dynamic client registration, Authorization Code with PKCE for exactly one resource, DPoP-bound ES256 tokens, pairwise subject identifiers, refresh rotation where a replayed refresh token revokes the grant, RFC 7009 revocation, and RFC 7662 introspection that a publisher can only use for its own tokens. Everything lives in memory.
 
 **[ope-reader](./ope-reader/)**: `ope-client.js` is the whole protocol in about 200 lines of fetch and WebCrypto, with no dependencies. The CLI and the browser app both use it. The browser app keeps its DPoP private key inside WebCrypto, where it can't be exported.
 
-**[eleventy-plugin-ope](./eleventy-plugin-ope/)**: Add it to an Eleventy site with a scope and Offers. It writes the RFC 9728 metadata documents (per scope, plus per post where a post has Offers of its own), adds the feed's `_ope` blocks, and writes an index of gated posts for your server.
+**[eleventy-plugin-ope](./eleventy-plugin-ope/)**: Everything a publisher needs, in four steps: install, describe your Offers, add the plugin, add a three-line Netlify Function (or one line of Express). At build time it writes the RFC 9728 metadata, the feed's `_ope` blocks, and the routing. It moves full posts out of the published site. At request time it runs the spec §11.2 checks.
 
 ## Tests
 
@@ -100,7 +100,7 @@ Not in this demo yet: `limit` Entitlements end to end (the publisher counts them
 
 ## Hosting
 
-This branch runs locally. The hosted demo on Netlify stays on the `v0.1` branch until a License Server is hosted too: the publisher alone can't issue tokens. The publisher is ready for Netlify (`ope-blog/netlify.toml`, `functions/gate.js`). Set `OPE_SITE_URL`, `OPE_LICENSE_SERVER`, and `OPE_RS_CLIENT_SECRET` there when the time comes.
+This branch runs locally. The publisher is ready for Netlify (`ope-blog/netlify.toml`, `functions/ope.mjs`); it needs `OPE_LICENSE_SERVER` set, and a hosted License Server to point it at.
 
 ## AT Protocol
 

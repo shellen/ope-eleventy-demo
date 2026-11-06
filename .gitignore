@@ -5,3 +5,4 @@ test-results/
 .env
 .env.*
 ope-eleventy-demo/
+.ope/

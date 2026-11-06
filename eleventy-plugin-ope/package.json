@@ -1,8 +1,22 @@
 {
   "name": "eleventy-plugin-ope",
   "version": "0.2.0",
-  "description": "Eleventy plugin for Open Portable Entitlement (OPE) v0.2: generates OAuth Protected Resource metadata, feed Offers, and an index of gated posts",
+  "description": "Eleventy plugin for Open Portable Entitlement (OPE) v0.2: publishes OAuth Protected Resource metadata and feed Offers, and serves gated posts through the spec's checks on Express or Netlify",
   "main": "index.cjs",
+  "exports": {
+    ".": "./index.cjs",
+    "./serve": "./serve.mjs",
+    "./express": "./express.mjs",
+    "./netlify": "./netlify.mjs",
+    "./gate": "./gate.mjs"
+  },
+  "files": [
+    "index.cjs",
+    "serve.mjs",
+    "express.mjs",
+    "netlify.mjs",
+    "gate.mjs"
+  ],
   "keywords": [
     "eleventy",
     "eleventy-plugin",
@@ -17,5 +31,8 @@
   "license": "MIT",
   "peerDependencies": {
     "@11ty/eleventy": ">=3.0.0"
+  },
+  "dependencies": {
+    "jose": "^6.2.15"
   }
 }

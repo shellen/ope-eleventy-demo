@@ -1,12 +1,17 @@
 // ABOUTME: The publisher's OPE settings, shared by the Eleventy build and the server.
 // ABOUTME: One source of truth for the scope, Offers, and which License Servers may issue.
 
-const siteUrl = (process.env.OPE_SITE_URL || "http://localhost:8080").replace(/\/$/, "");
+// On Netlify, URL is the site's primary address; OPE_SITE_URL overrides it.
+const siteUrl = (process.env.OPE_SITE_URL || process.env.URL || "http://localhost:8080").replace(/\/$/, "");
 const licenseServer = (process.env.OPE_LICENSE_SERVER || "http://localhost:4000").replace(/\/$/, "");
 
 export default {
   siteUrl,
   publisherName: "OPE Demo Blog",
+  // The layout the plugin renders full posts with; it gets ope_unlocked: true.
+  fullLayout: "post.njk",
+  // Write _redirects sending each gated post to functions/ope.mjs.
+  netlify: { functionName: "ope" },
   // Publisher identifier (spec §5.8): this site's own origin.
   publisher: `${siteUrl}/`,
   // License Servers allowed to issue for this blog (spec §7.1, authorization_servers).

@@ -23,6 +23,7 @@ const RS_SECRET = "flow-test-secret";
 
 const procs = [];
 let siteDir;
+let contentFile;
 const client = createClient();
 let authServer;
 
@@ -40,11 +41,12 @@ function start(cwd, env) {
 
 before(async () => {
   siteDir = mkdtempSync(join(tmpdir(), "ope-site-"));
-  const env = { ...process.env, OPE_SITE_URL: SITE, OPE_LICENSE_SERVER: LS };
+  contentFile = `${siteDir}.content.json`; // full posts live outside the published site
+  const env = { ...process.env, OPE_SITE_URL: SITE, OPE_LICENSE_SERVER: LS, OPE_CONTENT_FILE: contentFile };
   execFileSync(process.execPath, [join(ROOT, "ope-blog/node_modules/@11ty/eleventy/cmd.cjs"), "--quiet", `--output=${siteDir}`],
     { cwd: join(ROOT, "ope-blog"), env, stdio: "ignore" });
   start(join(ROOT, "ope-blog"), {
-    PORT: "8298", OPE_SITE_URL: SITE, OPE_LICENSE_SERVER: LS, OPE_SITE_DIR: siteDir,
+    PORT: "8298", OPE_SITE_URL: SITE, OPE_LICENSE_SERVER: LS, OPE_SITE_DIR: siteDir, OPE_CONTENT_FILE: contentFile,
     OPE_RS_CLIENT_ID: "ope-demo-blog", OPE_RS_CLIENT_SECRET: RS_SECRET,
   });
   start(join(ROOT, "ope-license-server"), {
@@ -56,7 +58,10 @@ before(async () => {
 
 after(() => {
   for (const p of procs) p.kill();
-  if (siteDir) rmSync(siteDir, { recursive: true, force: true });
+  if (siteDir) {
+    rmSync(siteDir, { recursive: true, force: true });
+    rmSync(`${siteDir}.content.json`, { force: true });
+  }
 });
 
 // One app install: registration, a DPoP key (or none), and an authorization for one resource.

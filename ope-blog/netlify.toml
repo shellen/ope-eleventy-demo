@@ -1,13 +1,14 @@
-# Hosted deploy of the OPE demo publisher. The License Server is not hosted yet,
-# so the hosted site stays on the v0.1 branch until it is (see README).
+# Hosted deploy of the OPE v0.2 demo publisher. The plugin writes _redirects, which
+# send each gated post's URL to functions/ope.mjs.
 [build]
   command = "npx @11ty/eleventy"
   publish = "_site"
   functions = "functions"
 
 [functions]
+  # esbuild bundles .ope/content.json into the function (it's imported there),
+  # so the full posts are never part of the published site.
   node_bundler = "esbuild"
-  included_files = ["_site/_ope/**", "_site/posts/**"]
 
 # OAuth metadata: JSON, readable from any origin
 [[headers]]

@@ -1,12 +1,16 @@
 ---
 layout: base.njk
 ---
+{#- ope_unlocked: the plugin is rendering the full version of a gated post (ope_post). -#}
+{%- set post_date = ope_post.date if ope_unlocked else page.date -%}
+{%- set post_data = ope_post.data if ope_unlocked else null -%}
+{%- set resource_type = post_data.ope_resource_type if ope_unlocked else ope_resource_type -%}
 <article>
   <h2>{{ title }}</h2>
   <div class="meta">
-    {{ page.date.toISOString().slice(0,10) }}
-    {% if ope_resource_type and ope_resource_type != "article" %} <span class="tag">{{ ope_resource_type }}</span>{% endif %}
-    {% if ope_gated %} <span class="tag gated">Subscribers only</span>{% endif %}
+    {{ post_date.toISOString().slice(0,10) }}
+    {% if resource_type and resource_type != "article" %} <span class="tag">{{ resource_type }}</span>{% endif %}
+    {% if ope_unlocked %} <span class="tag gated">Unlocked with OPE</span>{% elif ope_gated %} <span class="tag gated">Subscribers only</span>{% endif %}
   </div>
 
   {% if ope_gated %}
