@@ -33,6 +33,7 @@ The build writes:
 | `/_redirects` | Sends each gated post's URL to `functions/ope.mjs` on Netlify |
 | `.ope/content.json` | Outside `_site`: full posts and previews, read by the server or bundled into the function |
 | `/terms/` | The Terms. Tokens carry its SHA-256 digest |
+| `/reader/` | The browser reader from `../ope-reader`, as static files |
 
 ## Gating a post
 

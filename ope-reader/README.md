@@ -37,4 +37,6 @@ npm install && npm run web              # http://localhost:3000
 
 The same steps, one card at a time, showing the requests and responses. Sign-in opens in a popup. The DPoP private key is created non-extractable inside WebCrypto, so page script can sign with it but can't read it.
 
+The same page is also copied into the publisher site at `/reader/` (see `ope-blog/eleventy.config.js`). There it is plain static files and needs no proxy, since it's on the publisher's own origin. That's the version the hosted demo uses.
+
 The browser calls the License Server directly; its public endpoints allow any origin. Requests to the publisher go through `web.js`, which forwards only to the publisher's origin and passes `Authorization`, `DPoP`, and `Accept` through. Each DPoP proof still names the publisher's URL.

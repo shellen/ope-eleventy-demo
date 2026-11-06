@@ -8,6 +8,13 @@ export default function (eleventyConfig) {
   eleventyConfig.addPlugin(opePlugin, opeConfig);
   eleventyConfig.configureErrorReporting({ allowMissingExtensions: true });
 
+  // The browser reader, served from this site at /reader/ (same origin: no proxy needed).
+  eleventyConfig.addPassthroughCopy({
+    "../ope-reader/index.html": "reader/index.html",
+    "../ope-reader/ope-client.js": "reader/ope-client.js",
+    "../ope-reader/callback.html": "reader/callback/index.html",
+  });
+
   return {
     dir: { input: "src", output: "_site" },
     markdownTemplateEngine: "njk",

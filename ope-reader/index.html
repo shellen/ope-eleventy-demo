@@ -53,12 +53,18 @@
 <main id="steps"></main>
 
 <script type="module">
-import { createClient, generateDpopKey, pkce, decodeJwt } from "/ope-client.js";
+import { createClient, generateDpopKey, pkce, decodeJwt } from "./ope-client.js";
 
-const { publisher } = await (await fetch("/config.json")).json();
-const proxied = (url, init) => fetch("/proxy?url=" + encodeURIComponent(url), init);
+// Served by web.js, config.json names the publisher and /proxy reaches it. Served
+// from the publisher's own site (as /reader/), there is no config.json: the
+// publisher is this origin and needs no proxy.
+const config = await fetch("config.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
+const publisher = config?.publisher || location.origin;
+const proxied = config
+  ? (url, init) => fetch("/proxy?url=" + encodeURIComponent(url), init)
+  : (url, init) => fetch(url, init);
 const client = createClient({ fetchPublisher: proxied });
-const redirectUri = location.origin + "/callback";
+const redirectUri = new URL("callback/", location.href).href;
 const state = {}; // found, app, key, verifier, tokens, target
 
 // ── Step scaffolding ──

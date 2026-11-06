@@ -33,16 +33,8 @@ app.get("/", (_req, res) => res.sendFile(join(__dirname, "index.html")));
 app.get("/ope-client.js", (_req, res) => res.type("text/javascript").sendFile(join(__dirname, "ope-client.js")));
 app.get("/config.json", (_req, res) => res.json({ publisher: PUBLISHER }));
 
-// The OAuth redirect lands here, in the sign-in popup: hand the result to the
-// page that opened it, on this origin only, and close.
-app.get("/callback", (_req, res) => {
-  res.type("html").send(`<!doctype html><meta charset="utf-8"><title>Signed in</title>
-<p style="font-family:system-ui">Returning to the reader…</p>
-<script>
-  const params = Object.fromEntries(new URLSearchParams(location.search));
-  if (window.opener) { window.opener.postMessage({ ope: "callback", params }, location.origin); window.close(); }
-</script>`);
-});
+// The OAuth redirect lands in the sign-in popup, which hands the result back.
+app.get("/callback/", (_req, res) => res.sendFile(join(__dirname, "callback.html")));
 
 // Proxy to the publisher only: never an open proxy.
 app.get("/proxy", async (req, res) => {
