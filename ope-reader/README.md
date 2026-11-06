@@ -1,85 +1,40 @@
 # ope-reader
 
-A minimal **OPE reader** demo with both a **browser UI** and a **CLI**. Aligned with the [OPE spec v0.1](https://feedspec.org/ope).
+Two OPE v0.2 reader apps, a CLI and a browser UI, built on one client library.
 
-Both interfaces walk through the full OPE lifecycle:
-
-1. **Discover**: fetches `/.well-known/ope` from the publisher (spec Section 6)
-2. **Browse**: fetches the JSON Feed, lists free and gated items with `content_metadata` (spec Section 9)
-3. **Subscribe**: requests a grant token + refresh token from the gateway (spec Section 8)
-4. **Read**: uses the grant to fetch full content from the publisher (spec Section 10)
-5. **Refresh**: refreshes the grant with token rotation (spec Section 12.3)
-6. **Revoke**: revokes the grant with a reason code (spec Section 12.2)
-
-## Easiest: use the top-level launcher
-
-From the repo root:
-
-```bash
-./run-demo.sh
-```
-
-This starts the publisher, gateway, and reader web UI together. Open **http://localhost:3000** and click "Run Full Demo."
-
-## Browser UI
-
-The web UI is a single-page app that visually walks through each OPE step. Each step shows the actual HTTP request and response, and the gated article is rendered inline.
-
-```bash
-# Start publisher + gateway first (see below), then:
-cd ope-reader
-npm install
-npm run web
-# Open http://localhost:3000
-```
-
-You can change the **User ID** and **Grant type** in the UI to experiment with different scenarios (e.g., try `trial`, `per_item`, `gift`).
+`ope-client.js` is the protocol from an app's side, in about 200 lines with no dependencies: discovery from a `402` challenge, dynamic registration, PKCE, DPoP proofs, the token exchange, presenting the token, refresh, and revocation. It uses only `fetch` and WebCrypto, so the same file runs in Node 20+ and in browsers.
 
 ## CLI
 
-The CLI prints the same flow to the terminal, no dependencies required (Node 18+):
-
 ```bash
-cd ope-reader
-node reader.js
+node reader.js                          # opens the License Server's sign-in page in your browser
+node reader.js --auto alice             # fills in the demo forms as "alice", choosing the monthly Offer
+node reader.js --auto alice --offer annual
+node reader.js --auto bob --post 004 --offer item-building-for-readers   # buy one post
+node reader.js --no-dpop                # an unbound token, sent with the License scheme
+node reader.js --keep                   # leave the authorization in place at the end
+node reader.js --publisher http://localhost:8080
 ```
 
-## Prerequisites
+It walks [spec Appendix B](https://feedspec.org/ope/spec/0.2/#appendix-b-implementer-guide-informative) and prints each step:
 
-Start both the publisher and gateway first:
+1. Read the feed: which posts are gated, and the Offers
+2. Ask for a gated post with no token: `402`, and a challenge pointing to its metadata
+3. Register with the License Server
+4. Sign in and choose an Offer (a loopback redirect catches the code)
+5. Exchange the code for a DPoP-bound `license+jwt`
+6. Read the post at its own URL
+7. Show that a copied token fails without the app's key
+8. Refresh, then revoke, and show the publisher refusing the token
+
+`--auto` uses `auto-consent.js` to submit the demo forms directly. A real app opens the authorization URL in the person's browser.
+
+## Browser UI
 
 ```bash
-# Terminal 1 — Publisher (ope-blog on port 8080)
-cd ../ope-blog
-npm install && npm run dev
-
-# Terminal 2 — Gateway (on port 4000)
-cd ../ope-gateway
-npm install && npm start
+npm install && npm run web              # http://localhost:3000
 ```
 
-Make sure the publisher and gateway share the same `OPE_JWT_SECRET`:
+The same steps, one card at a time, showing the requests and responses. Sign-in opens in a popup. The DPoP private key is created non-extractable inside WebCrypto, so page script can sign with it but can't read it.
 
-```bash
-export OPE_JWT_SECRET=$(node -e "process.stdout.write(require('crypto').randomBytes(32).toString('hex'))")
-```
-
-Or use `./run-demo.sh` from the repo root, which generates a secret and starts all three components automatically.
-
-## CLI options
-
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--publisher` | `http://localhost:8080` | Publisher base URL |
-| `--gateway` | `http://localhost:4000` | Gateway base URL |
-| `--user` | `demo-reader` | User ID for the grant request |
-| `--content` | *(first gated item)* | Content ID to fetch |
-
-## Spec features demonstrated
-
-- **Discovery parsing**: reads `token_mode`, `max_ttl_seconds`, `batch_endpoint`, `broker_support` (Section 6)
-- **Content metadata**: shows `resource_type`, `word_count`, `estimated_read_time_minutes`, `unlock_cta`, `unlock_url`, `per_item_price` (Section 9.1.1)
-- **Media content**: handles `media` object and `media_alternatives` for podcast/video content (Section 10.1)
-- **Refresh token rotation**: uses `refresh_token` (not grant token) for refresh (Section 12.3)
-- **Structured revocation**: revokes with reason code (Section 12.2)
-- **Structured errors**: handles spec error format with `error`, `error_description`, `ope_discovery` (Section 10.3)
+The browser calls the License Server directly; its public endpoints allow any origin. Requests to the publisher go through `web.js`, which forwards only to the publisher's origin and passes `Authorization`, `DPoP`, and `Accept` through. Each DPoP proof still names the publisher's URL.

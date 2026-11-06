@@ -1,109 +1,70 @@
-# ope-gateway
+# ope-license-server
 
-A sample **OPE gateway** implementation in Node.js + Express, aligned with the [OPE spec v0.1](https://feedspec.org/ope).
+A readable OPE v0.2 License Server: an OAuth 2.0 authorization server that issues License Tokens. It's one file (`server.js`), and each section names the spec section it implements. Read it next to the [spec](https://feedspec.org/ope/spec/0.2/).
 
-In the OPE architecture, a gateway sits between readers and publishers. It manages subscriptions and issues the JWT grant tokens that readers present to publisher content APIs.
+It's a teaching implementation. Everything lives in memory, sign-in takes any name with no password, and "checkout" is a button. A production-grade server is tracked in [open-portable-entitlement#11](https://github.com/shellen/open-portable-entitlement/issues/11).
 
-## Quick start
+## Run
 
 ```bash
-cd ope-gateway
 npm install
-npm start          # or: npm run dev (auto-restart on changes)
+OPE_RS_CLIENT_SECRET=dev-secret npm start      # http://localhost:4000
+npm test                                        # end-to-end tests (builds and starts the publisher too)
 ```
 
-The server starts on `http://localhost:4000` by default.
+Give the publisher the same `OPE_RS_CLIENT_SECRET`, or use `../run-demo.sh`, which does it for you.
 
-## Environment variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `OPE_JWT_SECRET` | `dev-secret-change-me` | Shared secret for signing JWTs (must match the publisher) |
-| `OPE_GATEWAY_ISSUER` | `http://localhost:4000` | Issuer claim (`iss`) in tokens |
-| `PORT` | `4000` | Server port |
+| Variable | Default | What it is |
+|---|---|---|
+| `PORT` | `4000` | |
+| `OPE_ISSUER` | `http://localhost:$PORT` | The `iss` of every token |
+| `OPE_PROTECTED_RESOURCES` | `http://localhost:8080/posts/` | Scopes this server issues for, comma-separated (spec §7.2) |
+| `OPE_RS_CLIENT_ID` | `ope-demo-blog` | A publisher's introspection credential (spec §13.4) |
+| `OPE_RS_CLIENT_SECRET` | none | Without it, introspection is off and revocation only takes effect at expiry |
+| `OPE_RS_PUBLISHER` | `http://localhost:8080/` | The Publisher that credential may introspect for |
+| `OPE_SUBJECT_SECRET` | random per start | Key for pairwise subject identifiers. Set it to keep `sub` stable across restarts |
 
 ## Endpoints
 
-### `GET /.well-known/ope`
+| Endpoint | Spec | What it does |
+|---|---|---|
+| `GET /.well-known/oauth-authorization-server` | §7.2, RFC 8414 | Endpoints, `protected_resources`, and the `ope` member |
+| `GET /jwks.json` | §9.3 | The ES256 public key. A new key each start; publishers refetch on an unknown `kid` |
+| `POST /register` | §8.2, RFC 7591 | Public clients only. Redirects must be loopback, `https`, or a private-use scheme |
+| `GET /authorize` | §8.1 | Auth Code + PKCE (S256) for exactly one `resource`. Fetches the publisher's RFC 9728 metadata and checks that it lists this server |
+| `POST /login`, `POST /consent` | §8.4 | Demo sign-in, then consent: the app's name and that it's unreviewed, the Offers, a Terms link, how to revoke |
+| `POST /token` | §8.5, §9, §12.1 | Code exchange and refresh. A DPoP proof binds the token (`cnf.jkt`); the response includes `resource` and `entitlement` |
+| `POST /revoke` | §12.2, RFC 7009 | Revoking a refresh token ends the whole authorization |
+| `POST /introspect` | §12.4, RFC 7662 | Basic auth with a publisher's credential, for its own tokens only. Answers `permitted` for a `resource`, and `revocation_reason` when inactive |
+| `GET /account` | §17 | Your subscriptions (cancel) and connected apps (disconnect) |
 
-Returns the OPE discovery document (spec Section 6) describing this gateway's capabilities, including supported grant types, token mode, TTL limits, and plans.
-
-### `POST /api/entitlement/grant`
-
-Issue a new grant token (spec Sections 8, 22).
-
-```bash
-curl -X POST http://localhost:4000/api/entitlement/grant \
-  -H "Content-Type: application/json" \
-  -d '{"user_id": "alice", "grant_type": "subscription"}'
-```
-
-**Request body:**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| `user_id` | string | yes | Subscriber identifier |
-| `grant_type` | string | no | One of: `subscription`, `per_item`, `gift`, `institutional`, `metered`, `locale_free`, `patronage`, `broker`, `trial`, `rental`, `bundle`, `ad_supported`, `early_access`, `family` |
-| `content_ids` | string[] | no | Scoped content IDs (for `per_item`, `rental`, `bundle`) |
-| `meter_remaining` | number | no | Articles remaining (for `metered`) |
-| `ttl` | number | no | Token lifetime in seconds (default: 3600, max: 86400) |
-| `bundle_id` | string | no | Bundle identifier (for `bundle`) |
-| `group_id` | string | no | Household/group identifier (for `family`) |
-| `ad_free` | boolean | no | Ad-free flag (for `ad_supported`) |
-
-**Response:**
+## What a token looks like
 
 ```json
 {
-  "grant_token": "eyJhbGciOiJI...",
-  "refresh_token": "ope_rt_a1b2c3...",
-  "expires_in": 3600,
-  "grant_type": "subscription",
-  "scope": ["content:read"],
-  "token_id": "grant_a1b2c3d4e5f6"
+  "iss": "http://localhost:4000",
+  "sub": "s_spdXYczlc2lErooCDipk3u",
+  "client_id": "app_2d36c1753a0b6565",
+  "aud": ["http://localhost:8080"],
+  "resource": "http://localhost:8080/posts/",
+  "publisher": "http://localhost:8080/",
+  "terms": { "url": "http://localhost:8080/terms/", "sha256": "_iq8HsZf…" },
+  "entitlement": { "type": "access", "coverage": "collection", "duration": "recurring", "source": "direct", "offer": "monthly" },
+  "cnf": { "jkt": "0QjcFB2S57LmnJqE0fRpl0GiYRJxJWjbH1dPplhEoFw" },
+  "iat": 1793900000, "exp": 1793903600, "jti": "lt_…"
 }
 ```
 
-### `POST /api/entitlement/refresh`
+The header is `{"alg":"ES256","typ":"license+jwt","kid":"ls-…"}`.
 
-Refresh an existing grant token with **refresh token rotation** (spec Section 12.3). The old refresh token is invalidated and a new one is returned.
+## Behaviors worth knowing
 
-```bash
-curl -X POST http://localhost:4000/api/entitlement/refresh \
-  -H "Content-Type: application/json" \
-  -d '{"refresh_token": "ope_rt_a1b2c3..."}'
-```
+- **Pairwise subjects.** `sub` is an HMAC of the account and the Publisher: the same across apps for one publisher, different across publishers, and never the account name.
+- **What a token covers.** A subscription covers the scope (`coverage: "collection"`). A single purchase covers the one post (`coverage: "item"`). The token's `resource` says which.
+- **Refresh rotation.** Each refresh spends the old refresh token. If a spent one comes back, someone copied it, so the whole grant is revoked and every token from it stops working.
+- **Cancelling** on `/account` ends the Entitlement and revokes outstanding tokens with `revocation_reason: "entitlement_ended"`. Disconnecting an app revokes with `client_revoked`.
+- **Rentals** get tokens that expire no later than the rental does.
 
-### `POST /api/entitlement/revoke`
+## Not here
 
-Revoke a grant token (spec Section 12.2). Supports both `jti`-based and `token`-based revocation with an optional reason.
-
-```bash
-curl -X POST http://localhost:4000/api/entitlement/revoke \
-  -H "Content-Type: application/json" \
-  -d '{"jti": "grant_a1b2c3d4e5f6", "reason": "employee_departed"}'
-```
-
-## How it fits together
-
-```
-Reader ──► Gateway ──► Publisher
-           (this)
-  1. Reader asks gateway for a grant token
-  2. Gateway checks subscription status, issues JWT + refresh token
-  3. Reader sends JWT to publisher's content API
-  4. Publisher verifies JWT, returns full content
-  5. Before expiry, reader refreshes via the gateway (rotation)
-```
-
-## Spec alignment
-
-This sample implements:
-- All 14 grant types from Section 21
-- Refresh token rotation (Section 12.3)
-- Revocation with reason codes (Section 12.2)
-- Structured error responses (Section 10.3)
-- Discovery document with `max_ttl_seconds`, `batch_endpoint`, `broker_support` (Section 6)
-- CORS preflight for web clients (Section 11.5)
-
-In-memory storage is used for simplicity. In production you'd connect to a real database and payment processor.
+Real accounts and payment, persistence, key rotation, group and `limit` Entitlements, bundles, agent tokens (§13), and a reviewed-client list for publishers that set `client_policy`. With a `client_policy` that doesn't allow everyone, `/authorize` refuses, because no app here is reviewed.
