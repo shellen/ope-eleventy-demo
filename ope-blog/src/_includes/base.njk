@@ -28,10 +28,17 @@
     .tag { display: inline-block; font-size: 0.75rem; background: #f3f4f6; color: var(--muted); padding: 0.125rem 0.5rem; border-radius: 4px; margin-right: 0.25rem; }
     .tag.gated { background: #fef3c7; color: #92400e; }
     footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); }
+    .archive-banner { background: #f4f4f5; border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 2rem; font-size: 0.875rem; color: #3f3f46; }
     .ope-badge { font-size: 0.75rem; background: #eff6ff; color: var(--accent); padding: 0.125rem 0.5rem; border-radius: 4px; font-weight: 500; }
   </style>
 </head>
 <body>
+  <aside class="archive-banner" role="note">
+    <strong>Archived: OPE v0.1 demo.</strong>
+    This version is kept for reference.
+    {%- if archive.currentDemo %} The current demo implements the <a href="{{ archive.currentSpec }}">v0.2 draft</a>: <a href="{{ archive.currentDemo }}">{{ archive.currentDemo }}</a>.
+    {%- else %} The current demo implements the <a href="{{ archive.currentSpec }}">v0.2 draft</a>.{% endif %}
+  </aside>
   <header>
     <h1><a href="/">OPE Demo Blog</a></h1>
     <nav>
