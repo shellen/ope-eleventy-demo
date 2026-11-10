@@ -1,5 +1,9 @@
 # AT Protocol + OPE Identity Demo
 
+> **From OPE v0.1.** v0.2 identifies publishers by URL and defers AT Protocol to a
+> future profile (Profile E, waiting on atproto spaces). This example is kept for
+> reference and isn't part of the v0.2 flow. Its `publisherId` is a v0.1 concept.
+
 A zero-dependency, single-file demo showing how AT Protocol (Bluesky) identities
 integrate with OPE's portable entitlement model.
 

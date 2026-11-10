@@ -1,13 +1,14 @@
 {
   "name": "ope-blog",
-  "version": "0.1.0",
-  "description": "Minimal Eleventy blog with Open Portable Entitlement (OPE) support",
+  "version": "0.2.0",
+  "description": "Minimal Eleventy blog with Open Portable Entitlement (OPE) v0.2 support",
   "scripts": {
     "build": "npx @11ty/eleventy",
     "start": "node server.js",
     "dev": "npx @11ty/eleventy && node server.js",
-    "test": "npx @11ty/eleventy --quiet && node --test test-server.js",
-    "grant": "node scripts/create-grant.cjs"
+    "test": "npx @11ty/eleventy --quiet && node --test test/*.test.js",
+    "postinstall": "npm --prefix ../eleventy-plugin-ope install --omit=dev --omit=peer --no-package-lock --no-audit --no-fund --silent",
+    "dev:cloudflare": "wrangler dev"
   },
   "keywords": [
     "ope",
@@ -20,8 +21,12 @@
   "license": "MIT",
   "dependencies": {
     "@11ty/eleventy": "^3.0.0",
+    "eleventy-plugin-ope": "file:../eleventy-plugin-ope",
     "express": "^5.2.1",
-    "jsonwebtoken": "^9.0.0"
+    "jose": "^6.2.15"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "^4.160.0"
+  }
 }

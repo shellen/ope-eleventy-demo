@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Signed in</title></head>
+<body style="font-family: system-ui, sans-serif">
+<!-- The OAuth redirect lands here, in the sign-in popup: hand the result to the
+     page that opened it, on this origin only, and close. -->
+<p>Returning to the reader…</p>
+<script>
+  const params = Object.fromEntries(new URLSearchParams(location.search));
+  if (window.opener) {
+    window.opener.postMessage({ ope: "callback", params }, location.origin);
+    window.close();
+  }
+</script>
+</body>
+</html>

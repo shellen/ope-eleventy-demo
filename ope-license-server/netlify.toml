@@ -1,0 +1,16 @@
+# The OPE License Server on Netlify: one function serves every path.
+# Set OPE_LS_KEY (node scripts/generate-key.mjs), OPE_PROTECTED_RESOURCES, and
+# OPE_RS_CLIENT_SECRET / OPE_RS_PUBLISHER in the site's environment variables.
+[build]
+  command = "echo 'No build step: the License Server is a function'"
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/ls/:splat"
+  status = 200
+  force = true
