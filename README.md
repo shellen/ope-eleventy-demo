@@ -100,7 +100,7 @@ Not in this demo yet: `limit` Entitlements end to end (the publisher counts them
 
 ## Hosting
 
-This branch runs locally. The publisher is ready for Netlify (`ope-blog/netlify.toml`, `functions/ope.mjs`); it needs `OPE_LICENSE_SERVER` set, and a hosted License Server to point it at.
+Both the publisher and the License Server run on Cloudflare Workers' free plan (`wrangler.jsonc` in each folder) and on Netlify (`netlify.toml`). The hosted demo uses Cloudflare. On Cloudflare the License Server keeps its state and its signing key in a Durable Object, so its only settings are the publisher's scope and the shared introspection secret.
 
 ## AT Protocol
 

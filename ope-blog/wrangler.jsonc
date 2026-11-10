@@ -1,0 +1,13 @@
+// The OPE demo blog on Cloudflare Workers: the Eleventy build as static assets, and a
+// Worker in front that sends gated posts through the OPE checks.
+// Build variables: OPE_SITE_URL (this Worker's address) and OPE_LICENSE_SERVER.
+// Optional secret: OPE_RS_CLIENT_SECRET, the License Server's introspection credential.
+{
+  "name": "ope-demo",
+  "main": "cloudflare/worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "build": { "command": "rm -rf _site && npx @11ty/eleventy" },
+  "assets": { "directory": "_site", "binding": "ASSETS", "run_worker_first": true },
+  "observability": { "enabled": true }
+}

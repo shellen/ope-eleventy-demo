@@ -1,21 +1,23 @@
 {
   "name": "eleventy-plugin-ope",
   "version": "0.2.0",
-  "description": "Eleventy plugin for Open Portable Entitlement (OPE) v0.2: publishes OAuth Protected Resource metadata and feed Offers, and serves gated posts through the spec's checks on Express or Netlify",
+  "description": "Eleventy plugin for Open Portable Entitlement (OPE) v0.2: publishes OAuth Protected Resource metadata and feed Offers, and serves gated posts through the spec's checks on Express, Netlify, or Cloudflare",
   "main": "index.cjs",
   "exports": {
     ".": "./index.cjs",
     "./serve": "./serve.mjs",
     "./express": "./express.mjs",
     "./netlify": "./netlify.mjs",
-    "./gate": "./gate.mjs"
+    "./gate": "./gate.mjs",
+    "./cloudflare": "./cloudflare.mjs"
   },
   "files": [
     "index.cjs",
     "serve.mjs",
     "express.mjs",
     "netlify.mjs",
-    "gate.mjs"
+    "gate.mjs",
+    "cloudflare.mjs"
   ],
   "keywords": [
     "eleventy",

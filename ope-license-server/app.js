@@ -58,7 +58,8 @@ const RS_CREDENTIALS = new Map();
 if (process.env.OPE_RS_CLIENT_SECRET) {
   RS_CREDENTIALS.set(process.env.OPE_RS_CLIENT_ID || "ope-demo-blog", {
     secret: process.env.OPE_RS_CLIENT_SECRET,
-    publishers: [process.env.OPE_RS_PUBLISHER || "http://localhost:8080/"],
+    // Default: the origin of the first protected resource, as a Publisher identifier.
+    publishers: [process.env.OPE_RS_PUBLISHER || new URL(PROTECTED_RESOURCES[0]).origin + "/"],
   });
 }
 
@@ -82,17 +83,24 @@ async function loadKeys() {
   KID = "ls-" + (await calculateJwkThumbprint({ kty, crv, x, y })).slice(0, 12);
   PUBLIC_JWK = { kty, crv, x, y, kid: KID, alg: "ES256", use: "sig" };
 }
-const keysReady = loadKeys();
+// Loaded on first use: Cloudflare Workers don't allow generating keys or random
+// values while a module loads, only inside a request.
+let keysReady;
+const ensureKeys = () => (keysReady ||= loadKeys());
 
 // Pairwise subject identifiers (spec §8.3, §15): opaque, stable per person and
 // Publisher, the same across apps, and never the person's name.
 // Stable across restarts when OPE_LS_KEY is set (derived from it), unless set itself.
-const SUBJECT_SECRET = process.env.OPE_SUBJECT_SECRET
-  || (process.env.OPE_LS_KEY
-    ? createHash("sha256").update("ope-subject\n" + JSON.parse(process.env.OPE_LS_KEY).d).digest("hex")
-    : randomBytes(32).toString("hex"));
+// Chosen on first use, for the same reason as the keys.
+let subjectSecret;
+function getSubjectSecret() {
+  return (subjectSecret ||= process.env.OPE_SUBJECT_SECRET
+    || (process.env.OPE_LS_KEY
+      ? createHash("sha256").update("ope-subject\n" + JSON.parse(process.env.OPE_LS_KEY).d).digest("hex")
+      : randomBytes(32).toString("hex")));
+}
 function pairwiseSub(account, publisher) {
-  return "s_" + createHmac("sha256", SUBJECT_SECRET).update(`${account}\n${publisher}`).digest("base64url").slice(0, 22);
+  return "s_" + createHmac("sha256", getSubjectSecret()).update(`${account}\n${publisher}`).digest("base64url").slice(0, 22);
 }
 
 // ── State ───────────────────────────────────────────────────────────
@@ -387,7 +395,7 @@ You can disconnect this app any time from <a href="/account">your account</a>.</
 // ── App ─────────────────────────────────────────────────────────────
 
 const app = express();
-app.use(async (_req, _res, next) => { await keysReady; next(); });
+app.use(async (_req, _res, next) => { await ensureKeys(); next(); });
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 

@@ -86,7 +86,17 @@ import content from "../.ope/content.json" with { type: "json" };
 export const handler = netlifyHandler(config, content);
 ```
 
-Then set `OPE_LICENSE_SERVER` in Netlify's environment variables. With Express instead:
+Then set `OPE_LICENSE_SERVER` in Netlify's environment variables. On Cloudflare Workers, a Worker serves the static build as assets and sends gated posts through the checks:
+
+```js
+// cloudflare/worker.mjs, with "assets": { "directory": "_site", "binding": "ASSETS", "run_worker_first": true }
+import { cloudflareHandler } from "eleventy-plugin-ope/cloudflare";
+import content from "../.ope/content.json" with { type: "json" };
+
+export default cloudflareHandler(content);
+```
+
+With Express instead:
 
 ```js
 import { opeMiddleware } from "eleventy-plugin-ope/express";

@@ -6,3 +6,4 @@ test-results/
 .env.*
 ope-eleventy-demo/
 .ope/
+.wrangler/

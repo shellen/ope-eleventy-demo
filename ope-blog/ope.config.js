@@ -10,8 +10,9 @@ export default {
   publisherName: "OPE Demo Blog",
   // The layout the plugin renders full posts with; it gets ope_unlocked: true.
   fullLayout: "post.njk",
-  // Write _redirects sending each gated post to functions/ope.mjs.
-  netlify: { functionName: "ope" },
+  // On Netlify, write _redirects sending each gated post to functions/ope.mjs.
+  // (Netlify sets NETLIFY during its builds.)
+  netlify: process.env.NETLIFY ? { functionName: "ope" } : undefined,
   // Publisher identifier (spec §5.8): this site's own origin.
   publisher: `${siteUrl}/`,
   // License Servers allowed to issue for this blog (spec §7.1, authorization_servers).

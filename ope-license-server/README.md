@@ -10,6 +10,7 @@ It's a teaching implementation. Sign-in takes any name with no password, and "ch
 npm install
 OPE_RS_CLIENT_SECRET=dev-secret npm start      # http://localhost:4000
 npm test                                        # end-to-end tests, run twice: locally, and through the Netlify Function with Blobs
+npm run test:cloudflare                         # the same suite against the Cloudflare Worker, in Cloudflare's local runtime
 ```
 
 Give the publisher the same `OPE_RS_CLIENT_SECRET`, or use `../run-demo.sh`, which does it for you.
@@ -24,6 +25,19 @@ Give the publisher the same `OPE_RS_CLIENT_SECRET`, or use `../run-demo.sh`, whi
 | `OPE_RS_CLIENT_SECRET` | none | Without it, introspection is off and revocation only takes effect at expiry |
 | `OPE_RS_PUBLISHER` | `http://localhost:8080/` | The Publisher that credential may introspect for |
 | `OPE_SUBJECT_SECRET` | derived from `OPE_LS_KEY`, else random per start | Key for pairwise subject identifiers |
+
+## On Cloudflare
+
+`wrangler.jsonc` and `cloudflare/worker.mjs` run the same app as a Cloudflare Worker. Every request goes to one Durable Object, which keeps the state in memory, like the local server, and writes it to its own SQLite storage after each change. On its first run it also generates the signing key and stores it there. Its issuer is the Worker's own address.
+
+Set two things in the Worker's settings:
+
+| Name | Type | Value |
+|---|---|---|
+| `OPE_PROTECTED_RESOURCES` | Variable | The publisher's scope, for example `https://ope-demo.<your-subdomain>.workers.dev/posts/` |
+| `OPE_RS_CLIENT_SECRET` | Secret | A random secret. Give the publisher the same value |
+
+`npm run dev:cloudflare` runs it in Cloudflare's local runtime, and `npm run test:cloudflare` runs the end-to-end suite against it there. Cloudflare's runtime needs Express 5, which this package uses.
 
 ## On Netlify
 

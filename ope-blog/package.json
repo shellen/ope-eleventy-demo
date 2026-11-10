@@ -7,7 +7,8 @@
     "start": "node server.js",
     "dev": "npx @11ty/eleventy && node server.js",
     "test": "npx @11ty/eleventy --quiet && node --test test/*.test.js",
-    "postinstall": "npm --prefix ../eleventy-plugin-ope install --omit=dev --omit=peer --no-package-lock --no-audit --no-fund --silent"
+    "postinstall": "npm --prefix ../eleventy-plugin-ope install --omit=dev --omit=peer --no-package-lock --no-audit --no-fund --silent",
+    "dev:cloudflare": "wrangler dev"
   },
   "keywords": [
     "ope",
@@ -24,5 +25,8 @@
     "express": "^5.2.1",
     "jose": "^6.2.15"
   },
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "wrangler": "^4.160.0"
+  }
 }

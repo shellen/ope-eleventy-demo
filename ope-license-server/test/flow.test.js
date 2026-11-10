@@ -28,7 +28,7 @@ const client = createClient();
 let authServer;
 
 async function waitFor(url) {
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 600; i++) { // up to a minute: wrangler dev takes a while to start
     try { await fetch(url); return; } catch { await new Promise((r) => setTimeout(r, 100)); }
   }
   throw new Error(`${url} did not start`);

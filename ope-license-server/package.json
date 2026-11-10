@@ -7,12 +7,17 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test test/*.test.js && OPE_LS_ENTRY=test/netlify-shim.mjs node --test test/flow.test.js",
-    "generate-key": "node scripts/generate-key.mjs"
+    "generate-key": "node scripts/generate-key.mjs",
+    "dev:cloudflare": "wrangler dev",
+    "test:cloudflare": "OPE_LS_ENTRY=test/cloudflare-dev.mjs node --test test/flow.test.js"
   },
   "dependencies": {
     "@netlify/blobs": "^11.1.8",
-    "express": "^4.21.0",
+    "express": "^5.3.0",
     "jose": "^6.2.15",
     "serverless-http": "^4.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.160.0"
   }
 }

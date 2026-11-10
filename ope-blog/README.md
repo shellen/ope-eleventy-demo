@@ -76,6 +76,15 @@ Then it serves the full post, or JSON (`url`, `title`, `content_html`) when the 
 
 The spec requires `https` Asset identifiers (§5.2). The local demo uses `http://localhost` so it runs without certificates. Set `OPE_SITE_URL` to an `https` origin anywhere else.
 
+## Cloudflare
+
+`wrangler.jsonc` and `cloudflare/worker.mjs` run the site as a Cloudflare Worker. The Eleventy build is served as static assets, and the Worker sends gated posts through the plugin's checks. The build records the site's public OPE settings in `.ope/content.json`, so the Worker needs no variables of its own.
+
+- **Build variables:** `OPE_SITE_URL` (the Worker's address, for example `https://ope-demo.<your-subdomain>.workers.dev`) and `OPE_LICENSE_SERVER`.
+- **Secret:** `OPE_RS_CLIENT_SECRET`, optional, for immediate revocation.
+
+`npm run dev:cloudflare` builds the site and runs it in Cloudflare's local runtime.
+
 ## Netlify
 
 `netlify.toml`, the plugin's generated `_redirects`, and `functions/ope.mjs` are ready. Deploy with base directory `ope-blog` and set `OPE_LICENSE_SERVER`, plus `OPE_RS_CLIENT_SECRET` for immediate revocation. The site's address comes from Netlify's `URL` unless `OPE_SITE_URL` is set. `npm install` also installs the plugin's own dependencies (the `postinstall` script), since the demo links the plugin from `../eleventy-plugin-ope` rather than from npm.

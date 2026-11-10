@@ -185,7 +185,11 @@ module.exports = function opePlugin(eleventyConfig, config) {
     }
     const file = path.resolve(config.contentFile || process.env.OPE_CONTENT_FILE || ".ope/content.json");
     fs.mkdirSync(path.dirname(file), { recursive: true });
-    fs.writeFileSync(file, JSON.stringify({ version: OPE_VERSION, siteUrl: config.siteUrl, posts }));
+    // The site's public OPE settings travel with the posts, so a host's runtime
+    // (the Cloudflare Worker) can serve them without its own configuration.
+    const { siteUrl, publisherName, publisher, licenseServers, terms, scopes, clientPolicy } = config;
+    const settings = { siteUrl, publisherName, publisher, licenseServers, terms, scopes, clientPolicy };
+    fs.writeFileSync(file, JSON.stringify({ version: OPE_VERSION, siteUrl, config: settings, posts }));
     fs.rmSync(path.join(dir.output, FULL_DIR), { recursive: true, force: true });
   });
 };
