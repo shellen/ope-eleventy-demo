@@ -4,16 +4,18 @@ title: Subscribe
 permalink: subscribe/
 ---
 <h2>Subscribe</h2>
-<p>Get every subscriber-only post, in this site or in any app that supports <a href="https://feedspec.org/ope/">Open Portable Entitlement</a>.</p>
+<p>Get every subscriber-only post in any app that supports <a href="https://feedspec.org/ope/">Open Portable Entitlement</a>. This demo hosts one: the <a href="/reader/">reader app</a>.</p>
 
 {% for offer in ope.scopes[0].offers %}
 <div style="margin: 2rem 0; padding: 1.5rem; border: 1px solid var(--border); border-radius: 8px;">
   <h3 style="margin-bottom: 0.5rem;">{{ offer.name }}: ${{ offer.payment.amount }}{% if offer.payment.period == "P1M" %}/mo{% elif offer.payment.period == "P1Y" %}/yr{% endif %}</h3>
   <p style="color: var(--muted); font-size: 0.9rem; margin-bottom: 1rem;">{{ offer.preview_note | default("Full access to every subscriber-only post.") }}</p>
+  <a href="/reader/" class="cta" style="display: inline-block; background: var(--accent); color: #fff; padding: 0.5rem 1.25rem; border-radius: 6px; font-weight: 500;">Subscribe in the reader app</a>
 </div>
 {% endfor %}
 
 <div style="margin-top: 2rem; font-size: 0.9rem; color: var(--muted);">
-  <p>This is a demo, so there is no checkout. Subscriptions are created at the blog's License Server, <a href="{{ ope.licenseServers[0] }}/account">{{ ope.licenseServers[0] }}</a>, when you sign in from a reader app and choose an offer.</p>
+  <p>This is a demo, so there is no payment. In the reader app, choose a post: you sign in at the blog's License Server (any name works), choose one of these offers, and the app can then read every subscriber-only post. Manage your subscriptions and connected apps at <a href="{{ ope.licenseServers[0] }}/account">{{ ope.licenseServers[0] }}/account</a>.</p>
+  <p style="margin-top: 0.5rem;">Reading in the browser on this site itself (OPE's Web profile) isn't part of the demo yet.</p>
   <p style="margin-top: 0.5rem;">Your subscription then works in every OPE app you connect, each with its own token, and ends everywhere when you cancel. See the <a href="/terms/">terms</a>.</p>
 </div>

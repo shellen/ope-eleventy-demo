@@ -20,8 +20,9 @@ layout: base.njk
     <div class="gated-notice">
       <div class="stats">{{ content | opeWordCount }} words · {{ content | opeReadTime }} min read</div>
       <p style="margin-bottom: 0.75rem">{{ ope_cta | default("Subscribe to read the full post") }}</p>
-      <p style="margin-bottom: 0.75rem; font-size: 0.85rem">Already a subscriber? Open this post in any app that supports OPE.</p>
-      <a href="/subscribe/" class="cta">Subscribe</a>
+      <p style="margin-bottom: 0.75rem; font-size: 0.85rem">Subscribers read it in any app that supports OPE. Try the demo reader: sign in, pick an offer (no payment), and read.</p>
+      <a href="/reader/?post={{ page.url | opeAbsolute | urlencode }}" class="cta">Subscribe and read in the reader app</a>
+      <a href="/subscribe/" style="margin-left: 0.75rem; font-size: 0.85rem">See the offers</a>
     </div>
   {% else %}
     <div class="content">{{ content | safe }}</div>
