@@ -66,6 +66,8 @@ The steps match [Appendix B](https://feedspec.org/ope/spec/0.2/#appendix-b-imple
 
 ## The parts
 
+**Two ways to read.** On the blog itself, "Subscribe and read here" signs you in at the License Server and unlocks the post in your browser (the spec's Web profile). In any OPE app, the same subscription unlocks the same posts; the demo's reader app is at `/reader/`.
+
 **[ope-blog](./ope-blog/)**: An Eleventy blog with one scope (`/posts/`) and two subscription Offers. One post is also sold on its own, so it gets per-URL metadata. A gated post's URL serves a preview with a `402` until a request carries a valid token, then serves the full post. The blog itself has almost no OPE code: a config file, one plugin line, and a three-line Netlify Function. The checks live in the plugin.
 
 **[ope-license-server](./ope-license-server/)**: One readable file. Dynamic client registration, Authorization Code with PKCE for exactly one resource, DPoP-bound ES256 tokens, pairwise subject identifiers, refresh rotation where a replayed refresh token revokes the grant, RFC 7009 revocation, and RFC 7662 introspection that a publisher can only use for its own tokens. Everything lives in memory.

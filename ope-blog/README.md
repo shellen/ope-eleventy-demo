@@ -35,6 +35,12 @@ The build writes:
 | `/terms/` | The Terms. Tokens carry its SHA-256 digest |
 | `/reader/` | The browser reader from `../ope-reader`, as static files |
 
+## Subscribing and reading on the blog
+
+A gated post's **Subscribe and read here** button signs the reader in at the License Server and brings them back to the post, unlocked, with access kept in an `HttpOnly` cookie. That's the spec's Web profile, handled by the plugin's `/_ope/unlock` and `/_ope/callback` routes. Every subscriber-only post the subscription covers is then readable in that browser. **Stop reading on this browser** (`/_ope/leave`) forgets it. The same subscription works in any OPE app, like the reader at `/reader/`.
+
+Pages also carry `<link rel="terms-of-service">`, and Schema.org paywall markup on gated posts.
+
 ## Gating a post
 
 ```yaml

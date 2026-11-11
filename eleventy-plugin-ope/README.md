@@ -105,6 +105,20 @@ app.use(opeMiddleware(config));      // before express.static("_site")
 
 That's all a publisher writes. Optionally, set `OPE_RS_CLIENT_SECRET` (and `OPE_RS_CLIENT_ID`) to the introspection credential your License Server gives you. Revocation then takes effect at once instead of when the token expires, within the hour.
 
+## Unlocking posts on your site (Web profile)
+
+Readers can subscribe and read right on your site, with no separate app. A gated post's "Subscribe and read here" button goes to `/_ope/unlock?post=<path>`. The plugin then:
+
+1. **Starts the sign-in.** It signs the reader in at your License Server from your server, as a confidential client (Authorization Code + PKCE). The sign-in in progress is kept in a short-lived cookie signed with your client secret.
+2. **Finishes it at `/_ope/callback`.** It exchanges the code using the client secret, and checks the token like any other request (spec §11.2).
+3. **Keeps access in a cookie.** The token goes in an `HttpOnly; SameSite=Lax` cookie (`Secure` on https) that lasts no longer than the token, and the reader goes back to the post.
+
+Gated posts accept the cookie after the `Authorization` header, the order the spec gives. A cookie whose token has expired or been revoked is cleared, and the preview returns. `/_ope/leave?post=<path>` forgets it.
+
+It turns on when `OPE_RS_CLIENT_SECRET` is set: the same credential your License Server gives you for introspection, which also authenticates your site as a client (`OPE_RS_CLIENT_ID`, default `ope-demo-blog`). The License Server must list `<your site>/_ope/callback` as the client's redirect URI. On Netlify, the plugin's `_redirects` send `/_ope/*` to the function; on Cloudflare and Express, the handler sees every request already.
+
+In your layout, link the button to `/_ope/unlock?post={{ page.url | urlencode }}`. Add `<link rel="terms-of-service" href="/terms/">`, and Schema.org `isAccessibleForFree: false` markup on gated pages: the profile says pages SHOULD carry both. The demo blog's `post.njk` and `base.njk` show all three.
+
 ## Where full posts live
 
 Full posts are never part of the published site. The plugin renders them during the build, moves them with their previews into `.ope/content.json`, and deletes them from the output folder. That file is bundled into the Netlify Function, or read by the Express middleware. A static host has nothing secret to serve, however a request path is spelled. Add `.ope/` to `.gitignore`.
