@@ -35,7 +35,11 @@ It walks [spec Appendix B](https://feedspec.org/ope/spec/0.2/#appendix-b-impleme
 npm install && npm run web              # http://localhost:3000
 ```
 
-The same steps, one card at a time, showing the requests and responses. Sign-in opens in a popup. The DPoP private key is created non-extractable inside WebCrypto, so page script can sign with it but can't read it.
+A two-pane reader. The left pane is the blog's feed as a library, with each post marked locked, unlocked, or free. The right pane is the reading view. A locked post shows its preview and the blog's Offers, with a button that opens the License Server's sign-in in a popup. After you subscribe, every post the subscription covers turns unlocked in the library at once. The bottom of the library shows your access, with links to manage it at the License Server or disconnect the app.
+
+**Under the hood** opens a side panel that logs every request (the 402, the metadata, registration, sign-in, the token, each read) and what it means. It also has a "Try a copied token" test and the DPoP switch. `?post=<url>` opens a given post, which the blog's preview boxes use.
+
+The DPoP private key is created non-extractable inside WebCrypto, so page script can sign with it but can't read it. Publisher HTML is shown in a sandboxed frame with scripts off.
 
 The same page is also copied into the publisher site at `/reader/` (see `ope-blog/eleventy.config.js`). There it is plain static files and needs no proxy, since it's on the publisher's own origin. That's the version the hosted demo uses.
 

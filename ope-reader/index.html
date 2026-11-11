@@ -2,226 +2,536 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OPE Reader Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OPE Reader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400&family=JetBrains+Mono:wght@400;500&display=swap">
 <style>
+  /* Two panes: a library of posts on the left, a reading view on the right, and an
+     optional "Under the hood" panel that shows the protocol traffic. */
   :root {
-    --bg: #fafafa; --fg: #18181b; --muted: #52525b; --border: #e4e4e7; --card: #fff; --code: #f4f4f5;
-    --accent: #047857; --accent-bg: #ecfdf5; --warn: #b45309; --warn-bg: #fffbeb; --bad: #b91c1c; --bad-bg: #fef2f2;
-    --mono: ui-monospace, "SF Mono", "Cascadia Code", monospace;
+    --bg: #ffffff;
+    --sidebar: #f5f5f7;
+    --raised: #ffffff;
+    --fg: #1d1d1f;
+    --muted: #6e6e73;
+    --faint: #a1a1a6;
+    --line: #e5e5ea;
+    --accent: #2563eb;
+    --accent-fg: #ffffff;
+    --accent-soft: #e8efff;
+    --open: #15803d;
+    --open-soft: #e6f4ea;
+    --locked: #8e8e93;
+    --warn: #b45309;
+    --warn-soft: #fff7e6;
+    --bad: #c2410c;
+    --ui: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --read: "Newsreader", "Iowan Old Style", Georgia, serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+    --radius: 12px;
   }
   @media (prefers-color-scheme: dark) {
-    :root { --bg: #09090b; --fg: #fafafa; --muted: #a1a1aa; --border: #27272a; --card: #18181b; --code: #27272a;
-      --accent: #34d399; --accent-bg: #052e22; --warn: #fbbf24; --warn-bg: #2a1d05; --bad: #f87171; --bad-bg: #2a0b0b; }
+    :root {
+      --bg: #161618; --sidebar: #1e1e21; --raised: #232326; --fg: #f5f5f7; --muted: #a1a1a6; --faint: #6e6e73;
+      --line: #2e2e32; --accent: #6b9bff; --accent-fg: #0b1020; --accent-soft: #1c2742; --open: #4ade80; --open-soft: #13281b;
+      --locked: #8e8e93; --warn: #fbbf24; --warn-soft: #2a2110; --bad: #fb923c; color-scheme: dark;
+    }
   }
   * { box-sizing: border-box; }
-  body { margin: 0; font: 15px/1.55 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
-  header { padding: 1.5rem 1rem; border-bottom: 1px solid var(--border); }
-  header h1 { margin: 0; font-size: 1.25rem; }
-  header p { margin: 0.25rem 0 0; color: var(--muted); font-size: 0.9rem; }
-  main { max-width: 860px; margin: 0 auto; padding: 1rem; }
-  .step { background: var(--card); border: 1px solid var(--border); border-radius: 10px; margin: 0 0 1rem; }
-  .step > h2 { display: flex; gap: 0.6rem; align-items: center; margin: 0; padding: 0.75rem 1rem; font-size: 1rem; border-bottom: 1px solid var(--border); }
-  .step > h2 .n { width: 1.6rem; height: 1.6rem; border-radius: 50%; display: grid; place-items: center; font-size: 0.8rem; background: var(--code); color: var(--muted); flex: none; }
-  .step.done > h2 .n { background: var(--accent); color: var(--bg); }
-  .step.error > h2 .n { background: var(--bad); color: var(--bg); }
-  .step > h2 .spec { margin-left: auto; font: 0.75rem var(--mono); color: var(--muted); font-weight: normal; }
-  .body { padding: 0.75rem 1rem 1rem; }
-  .step:not(.open) .body { display: none; }
-  .explain { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.75rem; }
-  pre { background: var(--code); padding: 0.75rem; border-radius: 6px; font: 0.78rem/1.5 var(--mono); overflow: auto; max-height: 320px; white-space: pre-wrap; word-break: break-word; margin: 0.5rem 0; }
-  button { font: inherit; padding: 0.45rem 0.9rem; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--fg); cursor: pointer; margin: 0.25rem 0.4rem 0.25rem 0; }
-  button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
-  button:disabled { opacity: 0.5; cursor: default; }
-  .item { display: flex; gap: 0.75rem; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-left-width: 4px; border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.4rem 0; }
-  .item.gated { border-left-color: var(--warn); } .item.free { border-left-color: var(--accent); }
-  .tag { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
-  .gated .tag { color: var(--warn); } .free .tag { color: var(--accent); }
-  .status { display: inline-block; font: 600 0.8rem var(--mono); padding: 0.1rem 0.45rem; border-radius: 4px; }
-  .s2 { background: var(--accent-bg); color: var(--accent); } .s4 { background: var(--warn-bg); color: var(--warn); } .s5 { background: var(--bad-bg); color: var(--bad); }
-  iframe { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: 6px; background: #fff; }
-  label.inline { display: inline-flex; gap: 0.4rem; align-items: center; font-size: 0.9rem; color: var(--muted); }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--ui); -webkit-font-smoothing: antialiased; }
+  button { font: inherit; color: inherit; cursor: pointer; }
   a { color: var(--accent); }
-  .err { color: var(--bad); font-weight: 600; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+  .app { height: 100%; display: grid; grid-template-columns: 300px minmax(0, 1fr) auto; }
+
+  /* ── Library ── */
+  .library { background: var(--sidebar); border-right: 1px solid var(--line); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-height: 0; }
+  .library-head { padding: 22px 20px 12px; display: grid; gap: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; letter-spacing: -0.01em; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 7px; background: var(--fg); color: var(--bg); display: grid; place-items: center; font: 700 0.75rem/1 var(--ui); }
+  .source { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: var(--raised); border: 1px solid var(--line); }
+  .source-avatar { width: 34px; height: 34px; border-radius: 8px; background: linear-gradient(135deg, #2563eb, #7c3aed); color: #fff; display: grid; place-items: center; font-weight: 700; flex: none; }
+  .source-name { font-weight: 600; font-size: 0.92rem; line-height: 1.25; }
+  .source-host { font-size: 0.78rem; color: var(--muted); word-break: break-all; line-height: 1.25; }
+  .section-label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); padding: 8px 20px 6px; }
+  .posts { overflow-y: auto; padding: 0 10px 12px; }
+  .post-row { width: 100%; text-align: left; border: 0; background: transparent; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 10px; border-radius: 10px; }
+  .post-row:hover { background: color-mix(in srgb, var(--fg) 5%, transparent); }
+  .post-row[aria-current="true"] { background: var(--accent); color: var(--accent-fg); }
+  .post-row[aria-current="true"] .post-meta { color: color-mix(in srgb, var(--accent-fg) 75%, transparent); }
+  .post-title { font-weight: 600; font-size: 0.9rem; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .post-meta { font-size: 0.76rem; color: var(--muted); margin-top: 2px; }
+  .state { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; flex: none; transition: background 0.4s, color 0.4s, transform 0.4s; }
+  .state svg { width: 14px; height: 14px; }
+  .state.locked { color: var(--locked); background: color-mix(in srgb, var(--locked) 14%, transparent); }
+  .state.open { color: var(--open); background: var(--open-soft); }
+  .state.free { color: transparent; }
+  .post-row[aria-current="true"] .state.locked, .post-row[aria-current="true"] .state.open { color: var(--accent-fg); background: color-mix(in srgb, var(--accent-fg) 20%, transparent); }
+  .state.just-opened { animation: pop 0.6s ease; }
+  @keyframes pop { 0% { transform: scale(0.6); } 60% { transform: scale(1.18); } 100% { transform: scale(1); } }
+
+  .access { border-top: 1px solid var(--line); padding: 14px 16px 18px; display: grid; gap: 10px; }
+  .access-title { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
+  .access-body { font-size: 0.86rem; color: var(--muted); }
+  .access-body strong { color: var(--fg); font-weight: 600; }
+  .access-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip-btn { border: 1px solid var(--line); background: var(--raised); border-radius: 999px; padding: 5px 12px; font-size: 0.8rem; font-weight: 500; color: var(--fg); text-decoration: none; }
+  .chip-btn:hover { border-color: var(--faint); }
+  .chip-btn.danger { color: var(--bad); }
+
+  /* ── Reading pane ── */
+  .reader { min-width: 0; min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 20px; border-bottom: 1px solid var(--line); min-height: 56px; }
+  .toolbar .spacer { flex: 1; }
+  .back { display: none; border: 0; background: transparent; color: var(--accent); font-weight: 500; padding: 4px 0; }
+  .ghost { border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 6px 14px; font-size: 0.84rem; font-weight: 500; display: inline-flex; align-items: center; gap: 8px; }
+  .ghost[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .scroll { overflow-y: auto; }
+  .article { max-width: 680px; margin: 0 auto; padding: 48px 28px 96px; }
+  .kicker { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .badge { font-size: 0.72rem; letter-spacing: 0.02em; text-transform: none; font-weight: 600; padding: 3px 9px; border-radius: 999px; }
+  .badge.locked { background: color-mix(in srgb, var(--locked) 16%, transparent); color: var(--muted); }
+  .badge.open { background: var(--open-soft); color: var(--open); }
+  .article h1 { font-family: var(--read); font-weight: 600; font-size: clamp(1.9rem, 3.6vw, 2.6rem); line-height: 1.12; letter-spacing: -0.015em; margin: 14px 0 24px; text-wrap: balance; }
+  .body { font-family: var(--read); font-size: 1.2rem; line-height: 1.65; }
+  .body p { margin: 0 0 1.1em; }
+  .preview { position: relative; max-height: 15em; overflow: hidden; }
+  .preview::after { content: ""; position: absolute; inset: auto 0 0; height: 7em; background: linear-gradient(to bottom, transparent, var(--bg)); }
+  .content-frame { width: 100%; border: 0; display: block; min-height: 200px; }
+
+  .unlock { margin-top: 8px; border: 1px solid var(--line); border-radius: 18px; padding: 26px; background: var(--raised); display: grid; gap: 18px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -12px rgb(0 0 0 / 0.12); }
+  .unlock h2 { margin: 0; font-size: 1.2rem; letter-spacing: -0.01em; }
+  .unlock p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .offers { display: grid; gap: 8px; }
+  .offer { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; padding: 12px 14px; border-radius: 12px; background: var(--sidebar); }
+  .offer-name { font-weight: 600; font-size: 0.92rem; }
+  .offer-note { font-size: 0.8rem; color: var(--muted); }
+  .offer-price { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .primary { border: 0; background: var(--accent); color: var(--accent-fg); border-radius: 12px; padding: 13px 18px; font-weight: 600; font-size: 0.96rem; display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+  .primary:disabled { opacity: 0.6; cursor: progress; }
+  .fine { font-size: 0.78rem !important; color: var(--faint) !important; }
+  .progress { display: grid; gap: 8px; }
+  .progress-step { display: flex; gap: 10px; align-items: center; font-size: 0.88rem; color: var(--muted); }
+  .progress-step.done { color: var(--fg); }
+  .progress-step .tick { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--line); display: grid; place-items: center; flex: none; }
+  .progress-step.done .tick { background: var(--open); border-color: var(--open); color: #fff; }
+  .progress-step.active .tick { border-color: var(--accent); border-top-color: transparent; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error { color: var(--bad); font-size: 0.9rem; }
+  .empty { height: 100%; display: grid; place-items: center; color: var(--muted); padding: 32px; text-align: center; }
+
+  .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(20px); opacity: 0; background: var(--fg); color: var(--bg); padding: 10px 18px; border-radius: 999px; font-size: 0.88rem; font-weight: 500; transition: opacity 0.3s, transform 0.3s; pointer-events: none; z-index: 20; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* ── Under the hood ── */
+  .hood { width: 360px; border-left: 1px solid var(--line); background: var(--sidebar); display: grid; grid-template-rows: auto auto minmax(0, 1fr); min-height: 0; }
+  .hood[hidden] { display: none; }
+  .hood-head { padding: 16px 18px 8px; display: flex; align-items: center; justify-content: space-between; }
+  .hood-head h2 { margin: 0; font-size: 0.95rem; }
+  .hood-intro { padding: 0 18px 10px; font-size: 0.8rem; color: var(--muted); display: grid; gap: 10px; }
+  .hood-tools { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .switch { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: var(--muted); }
+  .log { overflow-y: auto; padding: 4px 12px 24px; display: grid; gap: 6px; align-content: start; }
+  .entry { background: var(--raised); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; display: grid; gap: 4px; }
+  .entry-line { display: flex; gap: 8px; align-items: baseline; font: 500 0.76rem/1.4 var(--mono); }
+  .entry-line .what { min-width: 0; overflow-wrap: anywhere; }
+  .code { font: 600 0.72rem/1 var(--mono); padding: 3px 6px; border-radius: 5px; flex: none; }
+  .c2 { background: var(--open-soft); color: var(--open); }
+  .c4 { background: var(--warn-soft); color: var(--warn); }
+  .c5 { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+  .cx { background: var(--accent-soft); color: var(--accent); }
+  .entry-why { font-size: 0.78rem; color: var(--muted); }
+  .entry details { font-size: 0.74rem; }
+  .entry pre { margin: 6px 0 0; padding: 8px; background: var(--sidebar); border-radius: 6px; overflow-x: auto; font: 0.7rem/1.45 var(--mono); white-space: pre-wrap; word-break: break-word; }
+
+  @media (max-width: 1100px) {
+    .hood { position: fixed; right: 0; top: 0; bottom: 0; z-index: 10; box-shadow: -12px 0 32px rgb(0 0 0 / 0.15); max-width: 92vw; padding-top: env(safe-area-inset-top, 0px); }
+  }
+  @media (max-width: 760px) {
+    .app { grid-template-columns: minmax(0, 1fr); }
+    .library { border-right: 0; padding-top: env(safe-area-inset-top, 0px); }
+    .app.reading .library { display: none; }
+    .app:not(.reading) .reader { display: none; }
+    .back { display: inline-block; }
+    .article { padding: 28px 18px 80px; }
+    .toolbar { padding-top: max(12px, env(safe-area-inset-top, 0px)); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
-<header>
-  <h1>OPE Reader</h1>
-  <p>An app reading a subscriber-only post with Open Portable Entitlement v0.2, one protocol step at a time.</p>
-</header>
-<main id="steps"></main>
+<div class="app" id="app">
+  <aside class="library" aria-label="Library">
+    <div class="library-head">
+      <div class="brand"><span class="brand-mark">OPE</span>Reader</div>
+      <div class="source" id="source"><div class="source-avatar">·</div><div><div class="source-name">Loading feed…</div></div></div>
+    </div>
+    <div class="posts" id="posts" role="list"></div>
+    <div class="access" id="access" aria-live="polite"></div>
+  </aside>
+
+  <main class="reader">
+    <div class="toolbar">
+      <button class="back" id="back" type="button">‹ Library</button>
+      <div class="spacer"></div>
+      <button class="ghost" id="hood-toggle" type="button" aria-pressed="false" aria-controls="hood"><span class="dot"></span>Under the hood</button>
+    </div>
+    <div class="scroll" id="scroll"><div class="empty" id="view">Choose a post from the library.</div></div>
+  </main>
+
+  <aside class="hood" id="hood" hidden aria-label="Under the hood">
+    <div class="hood-head"><h2>Under the hood</h2><button class="chip-btn" id="hood-close" type="button">Close</button></div>
+    <div class="hood-intro">
+      <p>Every request this app makes, and what it means. The app proves your subscription to the blog with a short-lived token from the License Server, tied to a key that never leaves this browser.</p>
+      <div class="hood-tools">
+        <label class="switch"><input type="checkbox" id="dpop" checked> Bind tokens to this browser's key (DPoP)</label>
+        <button class="chip-btn" id="copied" type="button" disabled>Try a copied token</button>
+      </div>
+    </div>
+    <div class="log" id="log" aria-live="polite"></div>
+  </aside>
+</div>
+<div class="toast" id="toast" role="status"></div>
 
 <script type="module">
-import { createClient, generateDpopKey, pkce, decodeJwt } from "./ope-client.js";
+import { createClient, generateDpopKey, pkce, decodeJwt, assetId } from "./ope-client.js";
 
 // Served by web.js, config.json names the publisher and /proxy reaches it. Served
-// from the publisher's own site (as /reader/), there is no config.json: the
-// publisher is this origin and needs no proxy.
+// from the publisher's own site (as /reader/), the publisher is this origin.
 const config = await fetch("config.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const publisher = config?.publisher || location.origin;
-const proxied = config
+const fetchPublisher = config
   ? (url, init) => fetch("/proxy?url=" + encodeURIComponent(url), init)
   : (url, init) => fetch(url, init);
-const client = createClient({ fetchPublisher: proxied });
 const redirectUri = new URL("callback/", location.href).href;
-const state = {}; // found, app, key, verifier, tokens, target
 
-// ── Step scaffolding ──
-const STEPS = [
-  ["feed", "Read the feed", "Feeds profile"],
-  ["discover", "Ask for the post with no token", "§7, §11.4"],
-  ["register", "Register this app", "§8.2"],
-  ["authorize", "Sign in and choose", "§8.1, §8.4"],
-  ["token", "Exchange the code for a License Token", "§8.5, §9"],
-  ["read", "Read the post", "§11.2"],
-  ["stolen", "Try a copied token", "§14"],
-  ["lifecycle", "Refresh and revoke", "§12"],
-];
-const root = document.getElementById("steps");
-for (const [id, title, spec] of STEPS) {
-  root.insertAdjacentHTML("beforeend", `<section class="step" id="s-${id}"><h2><span class="n">${STEPS.findIndex((s) => s[0] === id) + 1}</span>${title}<span class="spec">${spec}</span></h2><div class="body"></div></section>`);
-}
+const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
-const json = (v) => `<pre>${esc(JSON.stringify(v, null, 2))}</pre>`;
-const status = (n) => `<span class="status s${String(n)[0]}">${n}</span>`;
-function step(id, html, { done = true, error = false } = {}) {
-  const el = document.getElementById("s-" + id);
-  el.classList.add("open");
-  el.classList.toggle("done", done && !error);
-  el.classList.toggle("error", error);
-  el.querySelector(".body").innerHTML = html;
-  return el.querySelector(".body");
-}
-function fail(id, err) { step(id, `<p class="err">${esc(err.message || err)}</p>`, { error: true }); console.error(err); }
+const ICON = {
+  lock: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg>',
+  open: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="3" y="7" width="10" height="7" rx="2"/><path d="M5.5 7V5a2.5 2.5 0 0 1 4.9-.7"/></svg>',
+};
 
-// ── 1. Feed ──
-async function loadFeed() {
-  const feed = await (await proxied(publisher + "/feed.json")).json();
-  const offers = (feed._ope?.offers || []).map((o) => `${esc(o.name)} ($${esc(o.payment.amount)})`).join(" · ");
-  const body = step("feed", `<p class="explain">The feed marks gated posts with <code>_ope</code> and lists what's on offer. Choose a gated post to read it in this app.</p>
-    <p><strong>${esc(feed.title)}</strong><br><span class="explain">Offers: ${offers}</span></p>
-    ${feed.items.map((item, i) => `<div class="item ${item._ope ? "gated" : "free"}"><div><span class="tag">${item._ope ? "Gated" : "Free"}</span> ${esc(item.title)}${item._ope?.offers ? ` <span class="explain">(also sold on its own)</span>` : ""}</div>
-      ${item._ope ? `<button data-i="${i}">Read</button>` : ""}</div>`).join("")}
-    <label class="inline"><input type="checkbox" id="dpop" checked> Bind the token to a DPoP key</label>`);
-  body.querySelectorAll("button[data-i]").forEach((b) => b.onclick = () => discover(feed.items[b.dataset.i]).catch((e) => fail("discover", e)));
-  // Linked from a post's "read it in an app" box: ?post=<url> starts with that post.
-  const wanted = new URLSearchParams(location.search).get("post");
-  const item = wanted && feed.items.find((i) => i._ope && i.url === wanted);
-  if (item) discover(item).catch((e) => fail("discover", e));
+// ── State ──
+const state = {
+  feed: null,
+  items: [],          // { url, title, date, summary, preview, html, gated, status: free|locked|open }
+  selected: null,
+  found: new Map(),   // post url → discovery result
+  apps: new Map(),    // License Server issuer → registration
+  grants: [],         // { issuer, authServer, resource, coverage, tokens, offer, key, app }
+  key: null,          // this install's DPoP key
+};
+
+// ── Activity log ("Under the hood") ──
+function log(code, what, why, detail) {
+  const cls = code === "→" ? "cx" : `c${String(code)[0]}`;
+  const el = document.createElement("div");
+  el.className = "entry";
+  el.innerHTML = `<div class="entry-line"><span class="code ${cls}">${esc(code)}</span><span class="what">${esc(what)}</span></div>
+    ${why ? `<div class="entry-why">${why}</div>` : ""}
+    ${detail ? `<details><summary>Details</summary><pre>${esc(typeof detail === "string" ? detail : JSON.stringify(detail, null, 2))}</pre></details>` : ""}`;
+  $("log").prepend(el);
+}
+const path = (url) => { const u = new URL(url); return u.host === new URL(publisher).host ? u.pathname : u.host + u.pathname; };
+
+let quiet = false; // set while a test logs its own, clearer entries
+const client = createClient({
+  fetchPublisher: async (url, init) => {
+    const res = await fetchPublisher(url, init);
+    if (quiet) return res;
+    if (!url.includes("/.well-known/")) {
+      const why = res.status === 402 ? "No token: the post is for sale. The response says where its offers are."
+        : res.status === 200 ? "Token accepted. The blog checked its signature, what it covers, and this app's key."
+        : res.status === 401 ? "Token refused." : "";
+      log(res.status, `GET ${path(url)}`, why);
+    } else {
+      log(res.status, `GET ${path(url)}`, "The blog's metadata: which License Server sells access, and the offers.");
+    }
+    return res;
+  },
+});
+
+function toast(text) {
+  const t = $("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => t.classList.remove("show"), 3200);
 }
 
-// ── 2. Discovery ──
-async function discover(item) {
-  state.target = item;
-  state.useDpop = document.getElementById("dpop").checked;
-  const found = state.found = await client.discover(item.url);
-  step("discover", `<p class="explain">The publisher answers <code>402</code> with challenges naming the post's scope. The scope's metadata (RFC 9728) names the License Server; its own metadata (RFC 8414) has the endpoints.</p>
-    <p>GET ${esc(found.asset)} → ${status(found.status)}</p>
-    ${json(found.challenges)}
-    <p><strong>Resource metadata</strong> for <code>${esc(found.resourceMetadata.resource)}</code></p>${json(found.resourceMetadata)}
-    <p><strong>License Server</strong> <code>${esc(found.authServer.issuer)}</code> issues for</p>${json(found.authServer.protected_resources)}
-    <button class="primary" id="go-register">Register this app</button>`);
-  document.getElementById("go-register").onclick = () => register().catch((e) => fail("register", e));
+// ── Grants: which token, if any, covers a post (spec §10.4) ──
+const covers = (g, url) => g.coverage === "item" ? g.resource === assetId(url) : assetId(url).startsWith(g.resource);
+const grantFor = (url) => state.grants.find((g) => covers(g, url));
+
+function refreshStatuses(animate = false) {
+  for (const item of state.items) {
+    if (!item.gated) continue;
+    const before = item.status;
+    item.status = grantFor(item.url) ? "open" : "locked";
+    item.justOpened = animate && before === "locked" && item.status === "open";
+  }
+  renderLibrary();
+  renderAccess();
 }
 
-// ── 3. Registration ──
-async function register() {
-  state.app = await client.register(state.found.authServer, { clientName: "OPE Web Reader", redirectUri });
-  state.key = state.useDpop ? await generateDpopKey() : null;
-  step("register", `<p class="explain">A public client: no secret. ${state.key ? "The app also makes a DPoP key pair; the private key stays inside the browser's WebCrypto and can't be exported." : "No DPoP key: the token will be unbound."}</p>
-    ${json(state.app)}${state.key ? `<p>DPoP key thumbprint <code>${esc(state.key.jkt)}</code></p>` : ""}
-    <button class="primary" id="go-auth">Sign in at the License Server</button>`);
-  document.getElementById("go-auth").onclick = () => authorize().catch((e) => fail("authorize", e));
+// ── Library ──
+function renderLibrary() {
+  $("posts").innerHTML = state.items.map((item, i) => {
+    const icon = item.status === "free" ? "" : item.status === "open" ? ICON.open : ICON.lock;
+    const label = item.status === "free" ? "Free" : item.status === "open" ? "Unlocked" : "Subscribers only";
+    return `<button class="post-row" role="listitem" data-i="${i}" aria-current="${state.selected === item}">
+      <div><div class="post-title">${esc(item.title)}</div><div class="post-meta">${esc(item.dateLabel)} · ${label}</div></div>
+      <span class="state ${item.status}${item.justOpened ? " just-opened" : ""}" aria-hidden="true">${icon}</span>
+    </button>`;
+  }).join("");
+  $("posts").querySelectorAll(".post-row").forEach((b) => (b.onclick = () => select(state.items[b.dataset.i])));
 }
 
-// ── 4. Authorization (popup) ──
-async function authorize() {
-  const { verifier, challenge } = await pkce();
-  state.verifier = verifier;
-  state.oauthState = crypto.randomUUID();
-  const url = client.authorizationUrl(state.found.authServer, {
-    clientId: state.app.client_id, redirectUri, resource: state.found.asset, codeChallenge: challenge, state: state.oauthState,
-  });
-  step("authorize", `<p class="explain">The License Server signs the person in, shows what the app is asking for, and (in this demo) offers a pretend checkout. Any name works.</p><pre>${esc(url)}</pre><p>Waiting for the sign-in window…</p>`, { done: false });
-  const popup = window.open(url, "ope-signin", "width=520,height=720");
-  if (!popup) throw new Error("The sign-in window was blocked. Allow pop-ups for this page and try again.");
-  const params = await new Promise((resolve) => {
-    window.addEventListener("message", function onMessage(e) {
-      if (e.origin !== location.origin || e.data?.ope !== "callback") return;
-      window.removeEventListener("message", onMessage);
-      resolve(e.data.params);
+function renderAccess() {
+  $("copied").disabled = !state.grants.some((g) => g.key);
+  const el = $("access");
+  if (!state.grants.length) {
+    el.innerHTML = `<div class="access-title">Your access</div><div class="access-body">Not subscribed yet. Open a subscriber-only post to unlock it.</div>`;
+    return;
+  }
+  el.innerHTML = state.grants.map((g, i) => {
+    const mins = Math.max(0, Math.round((decodeJwt(g.tokens.access_token).exp * 1000 - Date.now()) / 60000));
+    const count = state.items.filter((it) => it.gated && covers(g, it.url)).length;
+    const what = g.coverage === "item" ? "this post" : `${count} subscriber-only post${count === 1 ? "" : "s"}`;
+    return `<div class="access-title">Your access</div>
+      <div class="access-body"><strong>${esc(g.offer || "Subscription")}</strong><br>Unlocks ${what} on ${esc(new URL(g.resource).host)}. Token renews in ${mins} min.</div>
+      <div class="access-actions">
+        <a class="chip-btn" href="${esc(g.issuer)}/account" target="_blank" rel="noopener">Manage</a>
+        <button class="chip-btn danger" data-disconnect="${i}" type="button">Disconnect app</button>
+      </div>`;
+  }).join("");
+  el.querySelectorAll("[data-disconnect]").forEach((b) => (b.onclick = () => disconnect(state.grants[b.dataset.disconnect])));
+}
+
+// ── Reading view ──
+function header(item) {
+  const badge = item.status === "free" ? "" : item.status === "open"
+    ? `<span class="badge open">Unlocked with OPE</span>` : `<span class="badge locked">Subscribers only</span>`;
+  return `<div class="kicker"><span>${esc(item.dateLabel)}</span>${badge}</div><h1>${esc(item.title)}</h1>`;
+}
+
+// Publisher HTML is shown in a sandboxed frame with scripts off, styled to match.
+function frameFor(html) {
+  const css = getComputedStyle(document.documentElement);
+  const v = (n) => css.getPropertyValue(n).trim();
+  const frame = document.createElement("iframe");
+  frame.className = "content-frame";
+  frame.setAttribute("sandbox", "allow-same-origin allow-popups");
+  frame.title = "Post";
+  frame.srcdoc = `<!doctype html><meta charset="utf-8"><base target="_blank">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Inter:wght@500;600&display=swap"><style>
+    html,body{background:${v("--bg")};color-scheme:${matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"}}
+    body{margin:0;font-family:${v("--read")};font-size:1.2rem;line-height:1.65;color:${v("--fg")}}
+    p{margin:0 0 1.1em} a{color:${v("--accent")}} h2,h3{font-family:${v("--ui")};line-height:1.25;margin:1.6em 0 .6em}
+    ul,ol{padding-left:1.3em} img{max-width:100%} blockquote{margin:1em 0;padding-left:1em;border-left:3px solid ${v("--line")};color:${v("--muted")}}
+  </style>${html}`;
+  frame.onload = () => {
+    const fit = () => { try { frame.style.height = frame.contentDocument.documentElement.scrollHeight + "px"; } catch {} };
+    fit(); setTimeout(fit, 300);
+  };
+  return frame;
+}
+
+// The article part of a full page from the blog: drop its own header and chrome.
+function articleBody(fullHtml) {
+  const doc = new DOMParser().parseFromString(fullHtml, "text/html");
+  const content = doc.querySelector("article .content") || doc.querySelector("article") || doc.body;
+  return content.innerHTML;
+}
+
+async function select(item) {
+  state.selected = item;
+  $("app").classList.add("reading");
+  renderLibrary();
+  const view = $("scroll");
+  view.scrollTop = 0;
+  view.innerHTML = `<article class="article" id="article">${header(item)}<div id="article-body"></div></article>`;
+  const body = $("article-body");
+  if (item.status === "free") {
+    body.append(frameFor(item.html));
+  } else if (item.status === "open") {
+    await readFull(item, body);
+  } else {
+    body.innerHTML = `<div class="body preview">${item.preview.split(/\n{2,}/).map((p) => `<p>${esc(p)}</p>`).join("")}</div><div id="unlock"></div>`;
+    renderUnlockCard(item);
+  }
+}
+
+async function renderUnlockCard(item) {
+  const box = $("unlock");
+  box.innerHTML = `<div class="unlock"><p>Checking how to unlock this post…</p></div>`;
+  try {
+    const found = state.found.get(item.url) || await client.discover(item.url);
+    state.found.set(item.url, found);
+    if (state.selected !== item) return;
+    const offers = found.resourceMetadata.ope.offers;
+    const price = (o) => o.payment.amount
+      ? `$${o.payment.amount}${o.payment.period === "P1M" ? "/mo" : o.payment.period === "P1Y" ? "/yr" : ""}`
+      : "Free";
+    box.innerHTML = `<div class="unlock">
+      <div><h2>Unlock this post</h2><p>${esc(found.resourceMetadata.resource_name || "This publisher")} sells access through a License Server. Subscribe there once, and this app can read every post the subscription covers.</p></div>
+      <div class="offers">${offers.map((o) => `<div class="offer"><div><div class="offer-name">${esc(o.name)}</div>${o.preview_note ? `<div class="offer-note">${esc(o.preview_note)}</div>` : ""}</div><div class="offer-price">${price(o)}</div></div>`).join("")}</div>
+      <button class="primary" id="unlock-go" type="button">Continue to the License Server</button>
+      <p class="fine">Opens ${esc(new URL(found.authServer.issuer).host)} in a new window. In this demo any name works and there's no payment.</p>
+      <div id="unlock-progress"></div>
+    </div>`;
+    $("unlock-go").onclick = () => unlock(item, found);
+  } catch (e) {
+    box.innerHTML = `<div class="unlock"><p class="error">${esc(e.message)}</p></div>`;
+  }
+}
+
+function progress(steps, active) {
+  $("unlock-progress").innerHTML = `<div class="progress">${steps.map((s, i) =>
+    `<div class="progress-step ${i < active ? "done" : i === active ? "active" : ""}"><span class="tick">${i < active ? "✓" : ""}</span>${esc(s)}</div>`).join("")}</div>`;
+}
+
+// ── Unlock: register (once), sign in at the License Server, get a token ──
+async function unlock(item, found) {
+  const steps = ["Connect this app to the License Server", "Sign in and choose an offer", "Receive a token for this browser", "Open the post"];
+  const as = found.authServer;
+  $("unlock-go").disabled = true;
+  try {
+    progress(steps, 0);
+    let app = state.apps.get(as.issuer);
+    if (!app) {
+      app = await client.register(as, { clientName: "OPE Reader", redirectUri });
+      state.apps.set(as.issuer, app);
+      log("→", `POST ${path(as.registration_endpoint)}`, `Registered this app with the License Server as <code>${esc(app.client_id)}</code>. No secret: it's a public app.`, app);
+    }
+    if ($("dpop").checked && !state.key) state.key = await generateDpopKey();
+    const key = $("dpop").checked ? state.key : null;
+
+    progress(steps, 1);
+    const { verifier, challenge } = await pkce();
+    const st = crypto.randomUUID();
+    const url = client.authorizationUrl(as, { clientId: app.client_id, redirectUri, resource: found.asset, codeChallenge: challenge, state: st });
+    log("→", `Open ${path(as.authorization_endpoint)}`, "Sign-in happens at the License Server, never in this app or on the blog.", url);
+    const popup = window.open(url, "ope-signin", "width=520,height=720");
+    if (!popup) throw new Error("The sign-in window was blocked. Allow pop-ups for this page, then try again.");
+    const params = await new Promise((resolve, reject) => {
+      const timer = setInterval(() => { if (popup.closed) { clearInterval(timer); setTimeout(() => reject(new Error("The sign-in window was closed.")), 500); } }, 600);
+      window.addEventListener("message", function onMessage(e) {
+        if (e.origin !== location.origin || e.data?.ope !== "callback") return;
+        window.removeEventListener("message", onMessage);
+        clearInterval(timer);
+        resolve(e.data.params);
+      });
     });
-  });
-  if (params.error) throw new Error(`${params.error}: ${params.error_description || ""}`);
-  if (params.state !== state.oauthState) throw new Error("state mismatch");
-  if (params.iss !== state.found.authServer.issuer) throw new Error("iss mismatch (RFC 9207)");
-  step("authorize", `<p class="explain">The License Server redirected back with a one-time code. <code>state</code> and <code>iss</code> match.</p>${json(params)}`);
-  await exchange(params.code);
+    if (params.error) throw new Error(params.error === "access_denied" ? "You declined, so nothing was unlocked." : `${params.error}: ${params.error_description || ""}`);
+    if (params.state !== st || params.iss !== as.issuer) throw new Error("The sign-in response didn't match this request.");
+
+    progress(steps, 2);
+    const tokens = await client.exchangeCode(as, { clientId: app.client_id, code: params.code, redirectUri, codeVerifier: verifier, resource: found.asset }, key);
+    const claims = decodeJwt(tokens.access_token);
+    const offer = found.resourceMetadata.ope.offers.find((o) => o.id === tokens.entitlement?.offer)?.name;
+    log(200, `POST ${path(as.token_endpoint)}`, `Token issued: ${tokens.token_type === "DPoP" ? "tied to this browser's key" : "not tied to a key"}, covering <code>${esc(path(tokens.resource))}</code>, valid ${Math.round(tokens.expires_in / 60)} min. The blog sees only an anonymous ID: <code>${esc(claims.sub)}</code>.`, claims);
+    state.grants = state.grants.filter((g) => !(g.issuer === as.issuer && g.resource === tokens.resource));
+    state.grants.push({ issuer: as.issuer, authServer: as, resource: tokens.resource, coverage: tokens.entitlement.coverage, tokens, offer, key, app });
+
+    progress(steps, 3);
+    const opened = state.items.filter((it) => it.gated && it.status === "locked" && covers(state.grants.at(-1), it.url)).length;
+    refreshStatuses(true);
+    toast(opened > 1 ? `Unlocked ${opened} posts with one subscription` : "Unlocked");
+    await select(item);
+  } catch (e) {
+    const p = $("unlock-progress");
+    if (p) p.innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    if ($("unlock-go")) $("unlock-go").disabled = false;
+  }
 }
 
-// ── 5. Token ──
-async function exchange(code) {
-  const as = state.found.authServer;
-  state.tokens = await client.exchangeCode(as, {
-    clientId: state.app.client_id, code, redirectUri, codeVerifier: state.verifier, resource: state.found.asset,
-  }, state.key);
-  showToken("token", "The token says who issued it, which publisher and URLs it covers, what kind of Entitlement it carries, and (if bound) which key must sign each request. The subject is opaque: the publisher never learns the person's name.");
-  await read();
-}
-function showToken(id, explain) {
-  const t = state.tokens;
-  const header = JSON.parse(atob(t.access_token.split(".")[0].replace(/-/g, "+").replace(/_/g, "/")));
-  step(id, `<p class="explain">${explain}</p>
-    <p><code>token_type</code> ${esc(t.token_type)} · covers <code>${esc(t.resource)}</code> · expires in ${t.expires_in}s</p>
-    <p><strong>Header</strong></p>${json(header)}<p><strong>Claims</strong></p>${json(decodeJwt(t.access_token))}`);
-}
-
-// ── 6. Read ──
-async function read() {
-  const r = await client.fetchAsset(state.target.url, state.tokens, state.key);
-  const body = step("read", `<p class="explain">The app asks for the post at its own URL with <code>Authorization: ${esc(state.tokens.token_type)} …</code>${state.key ? " and a fresh DPoP proof" : ""}. The publisher checks the signature, coverage, Entitlement, key, and revocation.</p>
-    <p>GET ${esc(state.target.url)} → ${status(r.status)}</p>
-    ${r.ok ? `<iframe sandbox title="Post content"></iframe>` : json(r.challenges)}
-    <p><button class="primary" id="go-stolen" ${state.key ? "" : "disabled"}>Try a copied token</button><button id="go-lifecycle">Refresh and revoke</button></p>`, { error: !r.ok });
-  if (r.ok) body.querySelector("iframe").srcdoc = r.body.content_html;
-  document.getElementById("go-stolen").onclick = () => stolen().catch((e) => fail("stolen", e));
-  document.getElementById("go-lifecycle").onclick = () => lifecycle().catch((e) => fail("lifecycle", e));
-}
-
-// ── 7. A copied token ──
-async function stolen() {
-  const thief = await generateDpopKey();
-  const a = await client.fetchAsset(state.target.url, state.tokens, thief);
-  const b = await client.fetchAsset(state.target.url, { ...state.tokens, token_type: "License" }, null);
-  step("stolen", `<p class="explain">Someone who copies a DPoP-bound token can't use it: every request needs a proof signed by the app's private key.</p>
-    <p>With another key's proof → ${status(a.status)} <code>${esc(a.challenges[0]?.params.error_description)}</code></p>
-    <p>As a License-scheme token → ${status(b.status)} <code>${esc(b.challenges[0]?.params.error_description)}</code></p>`);
-}
-
-// ── 8. Refresh and revoke ──
-async function lifecycle() {
-  const as = state.found.authServer;
-  const body = step("lifecycle", `<p class="explain">Tokens last an hour. Refreshing returns a new refresh token and spends the old one; if a spent one ever comes back, the License Server ends the whole authorization. Revoking stops the token at the publisher right away, because the publisher checks with the License Server.</p>
-    <button id="do-refresh">Refresh</button><button id="do-revoke">Revoke</button>
-    <a href="${esc(as.issuer)}/account" target="_blank" rel="noopener">Manage subscriptions and apps at the License Server</a>
-    <div id="lifecycle-out"></div>`);
-  const out = body.querySelector("#lifecycle-out");
-  body.querySelector("#do-refresh").onclick = async () => {
+// ── Reading an unlocked post (refreshing once if the token expired) ──
+async function readFull(item, body) {
+  const g = grantFor(item.url);
+  body.innerHTML = `<p class="fine">Opening…</p>`;
+  let r = await client.fetchAsset(item.url, g.tokens, g.key);
+  if (r.status === 401 && g.tokens.refresh_token) {
     try {
-      state.tokens = await client.refresh(as, { clientId: state.app.client_id, refreshToken: state.tokens.refresh_token }, state.key);
-      const r = await client.fetchAsset(state.target.url, state.tokens, state.key);
-      out.innerHTML = `<p>Refreshed. New token reads the post → ${status(r.status)}</p>${json(decodeJwt(state.tokens.access_token))}`;
-    } catch (e) { out.innerHTML = `<p class="err">${esc(e.message)}</p>`; }
-  };
-  body.querySelector("#do-revoke").onclick = async () => {
-    await client.revoke(as, { clientId: state.app.client_id, token: state.tokens.refresh_token });
-    const r = await client.fetchAsset(state.target.url, state.tokens, state.key);
-    out.innerHTML = `<p>Revoked. The same access token now gets ${status(r.status)} <code>${esc(r.challenges[0]?.params.error_description)}</code></p>`;
-  };
+      g.tokens = await client.refresh(g.authServer, { clientId: g.app.client_id, refreshToken: g.tokens.refresh_token }, g.key);
+      log(200, `POST ${path(g.authServer.token_endpoint)}`, "Token renewed with the refresh token. The old refresh token is now spent.");
+      r = await client.fetchAsset(item.url, g.tokens, g.key);
+    } catch {}
+  }
+  if (r.ok) {
+    body.innerHTML = "";
+    body.append(frameFor(articleBody(r.body.content_html)));
+  } else {
+    state.grants = state.grants.filter((x) => x !== g);
+    refreshStatuses();
+    await select(item);
+    toast("Your access ended, so the post is locked again");
+  }
 }
 
-loadFeed().catch((e) => fail("feed", e));
+async function disconnect(g) {
+  await client.revoke(g.authServer, { clientId: g.app.client_id, token: g.tokens.refresh_token });
+  log(200, `POST ${path(g.authServer.revocation_endpoint)}`, "Revoked this app's access. The blog refuses its token from the next request on.");
+  const r = await client.fetchAsset(state.items.find((it) => it.gated && covers(g, it.url)).url, g.tokens, g.key);
+  state.grants = state.grants.filter((x) => x !== g);
+  refreshStatuses();
+  toast(r.status === 401 ? "Disconnected. The blog now refuses this app's token." : "Disconnected.");
+  if (state.selected?.gated) select(state.selected);
+}
+
+// ── Under the hood: open/close, and the copied-token test ──
+function setHood(open) {
+  $("hood").hidden = !open;
+  $("hood-toggle").setAttribute("aria-pressed", String(open));
+}
+$("hood-toggle").onclick = () => setHood($("hood").hidden);
+$("hood-close").onclick = () => setHood(false);
+
+// What a stolen copy of the token is worth: present it without this browser's key.
+$("copied").onclick = async () => {
+  const g = state.grants.find((x) => x.key);
+  const post = state.items.find((it) => it.gated && covers(g, it.url));
+  const thief = await generateDpopKey();
+  quiet = true;
+  const a = await client.fetchAsset(post.url, g.tokens, thief).finally(() => { quiet = false; });
+  log(a.status, "Copied token, signed with another key", a.ok ? "Unexpectedly accepted." : "Refused: every request needs a proof from the key this token was issued to.");
+  quiet = true;
+  const b = await client.fetchAsset(post.url, { ...g.tokens, token_type: "License" }, null).finally(() => { quiet = false; });
+  log(b.status, "Copied token, sent without any proof", b.ok ? "Unexpectedly accepted." : "Refused: a key-bound token can't be used as a plain one.");
+  toast(!a.ok && !b.ok ? "Copied tokens don't work: both attempts were refused" : "A copied token was accepted");
+};
+$("back").onclick = () => { $("app").classList.remove("reading"); };
+
+// ── Start ──
+async function start() {
+  const feed = await (await fetchPublisher(publisher + "/feed.json")).json();
+  log(200, "GET /feed.json", "An ordinary feed. Subscriber-only posts carry an <code>_ope</code> block.");
+  state.feed = feed;
+  const host = new URL(publisher).host;
+  $("source").innerHTML = `<div class="source-avatar">${esc((feed.title || "?")[0])}</div><div><div class="source-name">${esc(feed.title)}</div><div class="source-host">${esc(host)}</div></div>`;
+  state.items = feed.items.map((i) => ({
+    url: i.url,
+    title: i.title,
+    dateLabel: new Date(i.date_published).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }),
+    gated: Boolean(i._ope),
+    // The feed's preview text can carry HTML entities (&quot;): decode them once here.
+    preview: new DOMParser().parseFromString(i.content_text || i.summary || "", "text/html").documentElement.textContent,
+    html: i.content_html || "",
+    status: i._ope ? "locked" : "free",
+  }));
+  renderLibrary();
+  renderAccess();
+  const wanted = new URLSearchParams(location.search).get("post");
+  const item = (wanted && state.items.find((i) => i.url === wanted)) || (window.innerWidth > 760 && state.items.find((i) => i.gated));
+  if (item) select(item);
+  else $("app").classList.remove("reading");
+}
+start().catch((e) => { $("view").innerHTML = `<p class="error">Couldn't load the feed: ${esc(e.message)}</p>`; });
 </script>
 </body>
 </html>
