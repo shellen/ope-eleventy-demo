@@ -9,15 +9,18 @@
     "test": "node --test test/*.test.js && OPE_LS_ENTRY=test/netlify-shim.mjs node --test test/flow.test.js",
     "generate-key": "node scripts/generate-key.mjs",
     "dev:cloudflare": "wrangler dev",
-    "test:cloudflare": "OPE_LS_ENTRY=test/cloudflare-dev.mjs node --test test/flow.test.js"
+    "test:cloudflare": "OPE_LS_ENTRY=test/cloudflare-dev.mjs node --test test/flow.test.js",
+    "test:spaces": "npm --prefix integration install --no-audit --no-fund --silent && node --test integration/spaces.test.js"
   },
   "dependencies": {
+    "@atproto/crypto": "^0.5.7",
     "@netlify/blobs": "^11.1.8",
     "express": "^5.3.0",
     "jose": "^6.2.15",
     "serverless-http": "^4.0.0"
   },
   "devDependencies": {
-    "wrangler": "^4.160.0"
+    "wrangler": "^4.160.0",
+    "@atproto/xrpc-server": "^0.13.11"
   }
 }

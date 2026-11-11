@@ -1,418 +1,204 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>AT Protocol + OPE Identity Demo</title>
-  <style>
-    :root {
-      --blue: #0085ff;
-      --gray-50: #f8fafc;
-      --gray-100: #f1f5f9;
-      --gray-200: #e2e8f0;
-      --gray-400: #94a3b8;
-      --gray-500: #64748b;
-      --gray-600: #475569;
-      --gray-700: #334155;
-      --gray-800: #1e293b;
-      --radius: 8px;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      color: var(--gray-800); background: var(--gray-50); line-height: 1.6;
-    }
-    .container { max-width: 640px; margin: 0 auto; padding: 2rem 1rem; }
-    a { color: var(--blue); text-decoration: none; }
-    a:hover { text-decoration: underline; }
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OPE and atproto Spaces</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+  /* One column: the idea, a live address builder, then the flow and its status. */
+  :root {
+    --bg: #ffffff; --panel: #f5f6f8; --fg: #16181d; --muted: #646a76; --line: #e3e6eb;
+    --sky: #0a7aff; --sky-soft: #e7f1ff; --ope: #15803d; --ope-soft: #e6f4ea; --warn: #9a5b00; --warn-soft: #fff4e0;
+    --ui: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111317; --panel: #1a1d23; --fg: #eef0f4; --muted: #9aa1ad; --line: #2a2e36;
+      --sky: #5aa9ff; --sky-soft: #14233a; --ope: #4ade80; --ope-soft: #12261a; --warn: #f5b74e; --warn-soft: #2a2010; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 var(--ui); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 56px max(20px, env(safe-area-inset-right, 0px)) 80px max(20px, env(safe-area-inset-left, 0px)); display: grid; gap: 48px; }
+  h1, h2, h3 { margin: 0; line-height: 1.15; letter-spacing: -0.015em; text-wrap: balance; }
+  h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
+  h2 { font-size: 1.35rem; }
+  p { margin: 0; }
+  a { color: var(--sky); }
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+  .eyebrow { font: 600 0.78rem/1 var(--ui); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  header { display: grid; gap: 16px; }
+  .lede { font-size: 1.15rem; color: var(--muted); max-width: 62ch; }
+  .lede strong { color: var(--fg); font-weight: 600; }
+  .status { display: inline-flex; gap: 8px; align-items: center; background: var(--warn-soft); color: var(--warn); border-radius: 999px; padding: 6px 12px; font-size: 0.82rem; font-weight: 600; width: fit-content; max-width: 100%; }
 
-    /* Search bar */
-    .search {
-      display: flex; gap: 0.5rem; margin-bottom: 2rem;
-    }
-    .search input {
-      flex: 1; padding: 0.6rem 0.8rem; border: 1px solid var(--gray-200);
-      border-radius: var(--radius); font-size: 1rem; background: white;
-    }
-    .search input:focus { outline: none; border-color: var(--blue); }
-    .search button {
-      padding: 0.6rem 1.2rem; background: var(--blue); color: white;
-      border: none; border-radius: var(--radius); font-size: 1rem; cursor: pointer;
-    }
-    .search button:hover { background: #0066cc; }
-    .search button:disabled { background: var(--gray-400); cursor: wait; }
+  section { display: grid; gap: 16px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 22px; display: grid; gap: 16px; min-width: 0; }
+  .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+  label { display: grid; gap: 6px; font-size: 0.82rem; font-weight: 600; color: var(--muted); flex: 1 1 200px; min-width: 0; }
+  input { font: 500 0.95rem var(--ui); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; width: 100%; }
+  input:focus { outline: 2px solid var(--sky); outline-offset: 1px; }
+  button { font: 600 0.92rem var(--ui); border: 0; border-radius: 10px; padding: 11px 18px; background: var(--fg); color: var(--bg); cursor: pointer; }
+  button.link { background: none; color: var(--sky); padding: 0; font-weight: 500; }
+  .profile { display: flex; gap: 12px; align-items: center; min-width: 0; }
+  .profile img { width: 44px; height: 44px; border-radius: 50%; object-fit: cover; background: var(--line); flex: none; }
+  .profile b { display: block; }
+  .profile span { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+  .addr { display: grid; gap: 4px; margin: 0; min-width: 0; }
+  .addr dt { font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+  .addr dd { margin: 0 0 8px; min-width: 0; font: 0.84rem/1.5 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; }
+  .addr dd pre { border: 0; padding: 0; background: none; border-radius: 0; }
+  #result { display: grid; gap: 14px; min-width: 0; }
+  .seg-auth { color: var(--sky); } .seg-type { color: var(--ope); } .seg-reader { color: var(--warn); }
+  pre { margin: 0; font: 0.82rem/1.55 var(--mono); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
+  .check { font-size: 0.88rem; display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; }
+  .ok { color: var(--ope); font-weight: 600; } .bad { color: var(--warn); font-weight: 600; }
+  .hint { font-size: 0.85rem; color: var(--muted); }
 
-    /* Profile */
-    .profile { text-align: center; margin-bottom: 2rem; }
-    .profile-avatar {
-      width: 80px; height: 80px; border-radius: 50%;
-      border: 3px solid var(--gray-200);
-    }
-    .profile h1 { font-size: 1.5rem; margin: 0.5rem 0 0.25rem; }
-    .handle { color: var(--gray-500); font-size: 0.9rem; }
-    .bio { color: var(--gray-600); margin: 0.5rem 0; font-size: 0.95rem; white-space: pre-wrap; }
-    .profile-stats {
-      display: flex; justify-content: center; gap: 1.5rem;
-      font-size: 0.85rem; color: var(--gray-500); margin-top: 0.75rem;
-    }
-    .profile-stats strong { color: var(--gray-800); }
+  .flow { padding: 0; margin: 0; display: grid; counter-reset: step; }
+  .flow li { list-style: none; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 14px; padding-bottom: 20px; position: relative; }
+  .flow li::before { counter-increment: step; content: counter(step); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 600 0.82rem/1 var(--mono); background: var(--panel); border: 1px solid var(--line); }
+  .flow li::after { content: ""; position: absolute; left: 15px; top: 32px; bottom: 2px; width: 1px; background: var(--line); }
+  .flow li:last-child::after { display: none; }
+  .flow b { display: block; }
+  .flow p { color: var(--muted); font-size: 0.93rem; }
+  .who { font: 600 0.72rem/1 var(--ui); letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: 999px; margin-left: 6px; vertical-align: 2px; white-space: nowrap; }
+  .who.ope { background: var(--ope-soft); color: var(--ope); } .who.sky { background: var(--sky-soft); color: var(--sky); }
 
-    /* Identity card */
-    .identity-card {
-      background: var(--gray-100); border: 1px solid var(--gray-200);
-      border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 2rem;
-      font-size: 0.85rem;
-    }
-    .identity-card h3 {
-      font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--gray-500); margin-bottom: 0.5rem;
-    }
-    .identity-card code {
-      background: white; padding: 0.15em 0.4em; border-radius: 4px;
-      font-size: 0.8rem; border: 1px solid var(--gray-200); word-break: break-all;
-    }
-    .identity-row {
-      display: flex; justify-content: space-between; align-items: baseline;
-      margin-bottom: 0.35rem; flex-wrap: wrap; gap: 0.25rem;
-    }
-    .identity-label { color: var(--gray-500); min-width: 120px; }
-
-    /* Posts */
-    .post {
-      background: white; border: 1px solid var(--gray-200);
-      border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 0.75rem;
-    }
-    .post-text { white-space: pre-wrap; margin-bottom: 0.75rem; }
-    .post-embed { margin-bottom: 0.75rem; }
-    .post-embed img { max-width: 100%; border-radius: 6px; }
-    .post-embed-link {
-      display: block; border: 1px solid var(--gray-200); border-radius: 6px;
-      padding: 0.75rem; color: var(--gray-700);
-    }
-    .embed-title { font-weight: 600; }
-    .embed-desc { font-size: 0.85rem; color: var(--gray-500); margin-top: 0.25rem; }
-
-    .post-meta {
-      display: flex; justify-content: space-between; align-items: center;
-      font-size: 0.8rem; color: var(--gray-400); flex-wrap: wrap; gap: 0.25rem;
-    }
-    .post-stats { display: flex; gap: 1rem; }
-    .post-stats span { display: inline-flex; align-items: center; gap: 0.25rem; }
-
-    .counts-compare {
-      font-size: 0.75rem; color: var(--gray-500);
-      background: var(--gray-50); border-radius: 4px;
-      padding: 0.4rem 0.6rem; margin-top: 0.5rem;
-    }
-    .counts-compare .row { display: flex; gap: 1rem; flex-wrap: wrap; }
-    .counts-compare .source { font-weight: 600; min-width: 100px; display: inline-block; }
-
-    .section-heading {
-      font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
-      color: var(--gray-400); margin: 1.5rem 0 0.75rem; padding-bottom: 0.5rem;
-      border-bottom: 1px solid var(--gray-200);
-    }
-
-    .loading { text-align: center; color: var(--gray-400); padding: 2rem; }
-    .error { background: #fef2f2; border: 1px solid #fecaca; border-radius: var(--radius); padding: 1rem; color: #991b1b; margin-bottom: 1rem; }
-
-    .info-box {
-      font-size: 0.9rem; color: var(--gray-600);
-      background: white; border: 1px solid var(--gray-200);
-      border-radius: var(--radius); padding: 1rem 1.25rem;
-    }
-    .info-box ul { margin: 0.75rem 0; padding-left: 1.25rem; }
-    .info-box code { background: var(--gray-100); padding: 0.1em 0.35em; border-radius: 3px; font-size: 0.85em; }
-
-    footer {
-      text-align: center; margin-top: 2rem; padding-top: 1rem;
-      border-top: 1px solid var(--gray-200);
-      font-size: 0.8rem; color: var(--gray-400);
-    }
-    footer a { color: var(--gray-500); }
-
-    .hidden { display: none; }
-  </style>
+  .split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .split ul { margin: 0; padding-left: 1.1em; display: grid; gap: 8px; font-size: 0.93rem; }
+  footer { color: var(--muted); font-size: 0.85rem; }
+  @media (max-width: 680px) { .split { grid-template-columns: minmax(0, 1fr); } }
+</style>
 </head>
 <body>
-  <div class="container">
-    <div class="search">
-      <input type="text" id="handle-input" placeholder="Enter a Bluesky handle (e.g. bsky.app)" value="bsky.app">
-      <button id="load-btn" onclick="loadProfile()">Load</button>
+<div class="wrap">
+  <header>
+    <p class="eyebrow">Open Portable Entitlement · AT Protocol</p>
+    <h1>Subscriber-only posts on atproto, with OPE deciding who reads</h1>
+    <p class="lede">atproto <strong>spaces</strong> let a publisher keep posts that only some accounts can read. A space can hand each "may this person read?" decision to an outside service. Pointed at an <strong>OPE License Server</strong>, that question becomes "do they have an active subscription?", the same subscription that unlocks the publisher's site and every OPE app.</p>
+    <span class="status">● atproto spaces are in alpha. The prototype passes against Bluesky's own spaces PDS, run locally, but not yet against a hosted space.</span>
+  </header>
+
+  <section aria-labelledby="build-h">
+    <h2 id="build-h">Build a publisher's space</h2>
+    <p class="hint">Type any atproto handle. This page looks up the account's DID and shows the addresses and policy a subscriber-only space would use.</p>
+    <div class="panel">
+      <form class="row" id="lookup">
+        <label for="handle">Publisher's handle<input id="handle" placeholder="yourname.bsky.social" autocomplete="off" required></label>
+        <button type="submit">Look up</button>
+      </form>
+      <p class="hint">Or try <button class="link" type="button" data-try="bsky.app">bsky.app</button> · <button class="link" type="button" data-try="atproto.com">atproto.com</button></p>
+      <div class="row">
+        <label for="ls">License Server<input id="ls" value="https://ope-license-server.jason-e0e.workers.dev"></label>
+        <label for="stype">Space type (an NSID)<input id="stype" value="com.example.blog.post"></label>
+        <label for="skey">Space key<input id="skey" value="subscribers"></label>
+      </div>
+      <div id="result" hidden></div>
     </div>
+  </section>
 
-    <div id="error" class="error hidden"></div>
+  <section aria-labelledby="flow-h">
+    <h2 id="flow-h">How a subscriber reads</h2>
+    <ol class="flow">
+      <li><div><b>Subscribe once <span class="who ope">OPE</span></b><p>At the publisher's License Server, from the blog or from any OPE app. It's the same subscription the rest of the demo uses.</p></div></li>
+      <li><div><b>Link an atproto account <span class="who ope">OPE</span></b><p>On the License Server's account page, the subscriber links their Bluesky (or other atproto) account. In the prototype this resolves the handle; a real version would have them sign in with it.</p></div></li>
+      <li><div><b>Open the space in an atproto app <span class="who sky">atproto</span></b><p>The app gets a short-lived delegation token from the subscriber's own server, then asks the space's host for a space credential.</p></div></li>
+      <li><div><b>The space asks the License Server <span class="who sky">atproto</span> <span class="who ope">OPE</span></b><p>The space's policy is <code>managedspace</code>, with the License Server as its managing app. The host calls <code>checkAccess</code> for this subscriber's DID, signed with the publisher's key.</p></div></li>
+      <li><div><b>The License Server answers from the subscription <span class="who ope">OPE</span></b><p><code>{"read": true, "write": false}</code> while the subscription is active. Subscribers read; only the publisher writes.</p></div></li>
+      <li><div><b>The app reads the posts <span class="who sky">atproto</span></b><p>With a space credential valid for 10 minutes (60 at most), bound to the app's key. When the subscription ends, the License Server answers no, and access lapses as credentials expire, within the hour OPE allows.</p></div></li>
+    </ol>
+  </section>
 
-    <div id="profile-section" class="hidden">
-      <div class="profile">
-        <img class="profile-avatar" id="avatar" src="" alt="">
-        <h1 id="display-name"></h1>
-        <div class="handle" id="handle-display"></div>
-        <p class="bio" id="bio"></p>
-        <div class="profile-stats">
-          <span><strong id="followers">0</strong> followers</span>
-          <span><strong id="following">0</strong> following</span>
-          <span><strong id="post-count">0</strong> posts</span>
-        </div>
-      </div>
-
-      <div class="identity-card">
-        <h3>OPE Identity Bridge</h3>
-        <p style="margin-bottom: 0.5rem; color: var(--gray-600);">
-          This Bluesky identity can serve as an OPE <code>publisherId</code> &mdash;
-          no separate DID registration needed.
-        </p>
-        <div class="identity-row">
-          <span class="identity-label">DID:</span>
-          <code id="identity-did"></code>
-        </div>
-        <div class="identity-row">
-          <span class="identity-label">Method:</span>
-          <code id="identity-method"></code>
-        </div>
-        <div class="identity-row">
-          <span class="identity-label">Handle:</span>
-          <code id="identity-handle"></code>
-        </div>
-        <div class="identity-row">
-          <span class="identity-label">OPE Discovery:</span>
-          <code id="identity-discovery"></code>
-        </div>
-      </div>
-
-      <div class="section-heading">Recent Posts</div>
-      <div id="posts"></div>
-
-      <div class="section-heading">How This Works</div>
-      <div class="info-box">
-        <p><strong>This page uses two open APIs, entirely client-side:</strong></p>
-        <ul>
-          <li>
-            <strong>Bluesky Public API</strong> (<code>public.api.bsky.app</code>) &mdash;
-            profile and posts, no auth required
-          </li>
-          <li>
-            <strong>Constellation by Microcosm</strong> (<code>constellation.microcosm.blue</code>) &mdash;
-            network-wide interaction counts from the AT Protocol firehose
-          </li>
-        </ul>
-        <p style="margin-top: 0.5rem;">
-          The <code>did:plc</code> identity from AT Protocol maps directly to an
-          OPE <code>publisherId</code>. No new identity system needed &mdash;
-          any Bluesky user already has a decentralized identifier that works
-          with OPE's portable entitlement model.
-        </p>
-      </div>
+  <section class="split" aria-label="Status">
+    <div class="panel">
+      <h3>Working now</h3>
+      <ul>
+        <li><b>Tested against Bluesky's own spaces-alpha PDS</b>, run locally: the PDS asks the License Server, and issues a space credential only while the reader is subscribed. It refuses unsubscribed, cancelled, and unlinked readers.</li>
+        <li>The License Server's managing-app endpoint, which checks that each request is signed by the space's owner, and its <code>did:web</code> identity.</li>
+        <li>Answers from the same subscriptions the blog and the reader app use.</li>
+        <li>Runs on Cloudflare Workers with the rest of the License Server.</li>
+      </ul>
     </div>
+    <div class="panel">
+      <h3>Not yet</h3>
+      <ul>
+        <li><b>A hosted space.</b> The spaces alpha server is invite-only, and the launch is expected within weeks.</li>
+        <li><b>Real account linking.</b> Today you type a handle and it isn't verified; a real version would have you sign in with that account (atproto OAuth).</li>
+        <li><b>Reading the posts.</b> The tests stop once the credential is issued; no app reads the space's posts with it yet.</li>
+        <li><b>Live access.</b> The live License Server doesn't manage any space until it's configured with one.</li>
+        <li><b>A stable API.</b> The alpha has shipped two versions of the call (<code>checkUserAccess</code> and <code>checkAccess</code>). The prototype answers both.</li>
+      </ul>
+    </div>
+  </section>
 
-    <footer>
-      <p>
-        <a href="https://atproto.com">AT Protocol</a> &middot;
-        <a href="https://constellation.microcosm.blue">Constellation</a> &middot;
-        <a href="https://www.microcosm.blue">Microcosm</a> &middot;
-        <a href="../">OPE Demo</a>
-      </p>
-      <p>Zero dependencies &middot; Vanilla JS &middot; No build step</p>
-    </footer>
-  </div>
+  <footer>Sources: <a href="https://github.com/bluesky-social/proposals/tree/main/0016-permissioned-data">atproto permissioned data proposal (0016)</a> · <a href="https://atproto.com/blog/atproto-spaces-alpha">spaces alpha announcement</a> · <a href="https://feedspec.org/ope/spec/0.2/">OPE v0.2 draft, Profile E</a></footer>
+</div>
 
-  <script>
-    const BSKY_API = "https://public.api.bsky.app";
-    const CONSTELLATION = "https://constellation.microcosm.blue";
+<script>
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const API = "https://public.api.bsky.app/xrpc";
+  let current = null; // { did, handle, displayName, avatar }
 
-    // Load on enter key
-    document.getElementById("handle-input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") loadProfile();
-    });
+  // Served from the OPE demo blog, use the License Server its metadata names.
+  fetch("/.well-known/oauth-protected-resource/posts/").then((r) => (r.ok ? r.json() : null)).then((m) => {
+    if (m?.authorization_servers?.[0]) $("ls").value = m.authorization_servers[0];
+  }).catch(() => {});
 
-    // Load from URL hash on page load
-    if (location.hash) {
-      document.getElementById("handle-input").value = location.hash.slice(1);
-      loadProfile();
+  const didWeb = (url) => { try { return "did:web:" + encodeURIComponent(new URL(url).host); } catch { return "did:web:?"; } };
+
+  async function lookup(handle) {
+    handle = handle.trim().replace(/^@/, "");
+    $("result").hidden = false;
+    $("result").innerHTML = `<p class="hint">Looking up ${esc(handle)}…</p>`;
+    try {
+      const r = await fetch(`${API}/app.bsky.actor.getProfile?actor=${encodeURIComponent(handle)}`);
+      if (!r.ok) throw new Error(r.status === 400 ? "No account with that handle." : `Lookup failed (HTTP ${r.status}).`);
+      const p = await r.json();
+      current = { did: p.did, handle: p.handle, displayName: p.displayName, avatar: p.avatar };
+      render();
+    } catch (e) {
+      $("result").innerHTML = `<p class="bad">${esc(e.message)}</p>`;
     }
+  }
 
-    async function loadProfile() {
-      const handle = document.getElementById("handle-input").value.trim().replace(/^@/, "");
-      if (!handle) return;
-
-      const btn = document.getElementById("load-btn");
-      const errorEl = document.getElementById("error");
-      const profileSection = document.getElementById("profile-section");
-
-      btn.disabled = true;
-      btn.textContent = "Loading...";
-      errorEl.classList.add("hidden");
-      profileSection.classList.add("hidden");
-
-      location.hash = handle;
-
-      try {
-        // Fetch profile
-        const profile = await fetchJson(
-          `${BSKY_API}/xrpc/app.bsky.actor.getProfile?actor=${encodeURIComponent(handle)}`
-        );
-
-        if (profile.error) throw new Error(profile.message || "Profile not found");
-
-        // Render profile
-        document.getElementById("avatar").src = profile.avatar || "";
-        document.getElementById("display-name").textContent = profile.displayName || profile.handle;
-        document.getElementById("handle-display").textContent = `@${profile.handle}`;
-        document.getElementById("bio").textContent = profile.description || "";
-        document.getElementById("followers").textContent = formatNum(profile.followersCount);
-        document.getElementById("following").textContent = formatNum(profile.followsCount);
-        document.getElementById("post-count").textContent = formatNum(profile.postsCount);
-
-        // Identity bridge
-        const didMethod = profile.did.startsWith("did:plc:") ? "did:plc" : "did:web";
-        document.getElementById("identity-did").textContent = profile.did;
-        document.getElementById("identity-method").textContent = didMethod;
-        document.getElementById("identity-handle").textContent = `@${profile.handle}`;
-        document.getElementById("identity-discovery").textContent =
-          `https://${profile.handle}/.well-known/ope`;
-
-        profileSection.classList.remove("hidden");
-
-        // Fetch posts
-        const feedData = await fetchJson(
-          `${BSKY_API}/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(handle)}&filter=posts_no_replies&limit=15`
-        );
-
-        renderPosts(feedData.feed || []);
-
-        // Fetch Constellation counts in parallel for all posts
-        enrichWithConstellation(feedData.feed || []);
-      } catch (err) {
-        errorEl.textContent = err.message;
-        errorEl.classList.remove("hidden");
-      } finally {
-        btn.disabled = false;
-        btn.textContent = "Load";
-      }
+  async function render() {
+    if (!current) return;
+    const { did, handle, displayName, avatar } = current;
+    const type = $("stype").value.trim() || "com.example.blog.post";
+    const skey = $("skey").value.trim() || "subscribers";
+    const ls = $("ls").value.trim().replace(/\/$/, "");
+    const managingApp = `${didWeb(ls)}#ope_space_manager`;
+    const space = `at://<span class="seg-auth">${esc(did)}</span>/space/<span class="seg-type">${esc(type)}</span>/${esc(skey)}`;
+    const record = `${space}/<span class="seg-reader">${esc(did)}</span>/${esc(type)}/3l2xample`;
+    const policy = JSON.stringify({ $type: "com.atproto.managedspace.policy", managingApp }, null, 2);
+    const config = JSON.stringify([{ space: `at://${did}/space/${type}/${skey}`, resource: "https://<publisher site>/posts/" }], null, 2);
+    $("result").innerHTML = `
+      <div class="profile">${avatar ? `<img src="${esc(avatar)}" alt="">` : `<img alt="">`}<div><b>${esc(displayName || handle)}</b><span>@${esc(handle)} · ${esc(did)}</span></div></div>
+      <dl class="addr">
+        <dt>The space (publisher's DID, space type, key)</dt><dd>${space}</dd>
+        <dt>A subscriber-only post in it, written by the publisher</dt><dd>${record}</dd>
+        <dt>The space's policy: the License Server decides who reads</dt><dd><pre>${esc(policy)}</pre></dd>
+        <dt>The License Server's matching setting, <code>OPE_MANAGED_SPACES</code></dt><dd><pre>${esc(config)}</pre></dd>
+      </dl>
+      <div class="check" id="ls-check"><span class="hint">Checking the License Server's atproto identity…</span></div>`;
+    try {
+      const r = await fetch(`${ls}/.well-known/did.json`);
+      const doc = r.ok ? await r.json() : null;
+      const svc = doc?.service?.find((s) => s.id === "#ope_space_manager");
+      $("ls-check").innerHTML = svc
+        ? `<span class="ok">✓ Resolves.</span><span class="hint"><code>${esc(doc.id)}</code> names its space-manager service at ${esc(svc.serviceEndpoint)}.</span>`
+        : `<span class="bad">Not found.</span><span class="hint">That License Server doesn't publish a space-manager service yet.</span>`;
+    } catch {
+      $("ls-check").innerHTML = `<span class="bad">Couldn't reach it.</span><span class="hint">Check the License Server address.</span>`;
     }
+  }
 
-    function renderPosts(feed) {
-      const container = document.getElementById("posts");
-      container.innerHTML = feed.map((item, i) => {
-        const post = item.post;
-        const url = bskyPostUrl(post.uri);
-        return `
-          <div class="post" id="post-${i}">
-            <div class="post-text">${escapeHtml(post.record?.text || "")}</div>
-            ${renderEmbed(post.embed)}
-            <div class="post-meta">
-              <a href="${url}" target="_blank">${relativeDate(post.record?.createdAt)}</a>
-              <div class="post-stats">
-                <span id="likes-${i}">${formatNum(post.likeCount)} likes</span>
-                <span>${formatNum(post.repostCount)} reposts</span>
-                <span>${formatNum(post.replyCount)} replies</span>
-              </div>
-            </div>
-            <div class="counts-compare hidden" id="constellation-${i}"></div>
-          </div>
-        `;
-      }).join("");
-    }
-
-    async function enrichWithConstellation(feed) {
-      for (let i = 0; i < feed.length; i++) {
-        const post = feed[i].post;
-        const el = document.getElementById(`constellation-${i}`);
-        if (!el) continue;
-
-        try {
-          const subject = encodeURIComponent(post.uri);
-          // Use the current XRPC endpoint (blue.microcosm.links.getBacklinksCount)
-          // source format: "collection:path" (no leading dot on path)
-          const [likes, reposts, replies] = await Promise.all([
-            fetchJson(`${CONSTELLATION}/xrpc/blue.microcosm.links.getBacklinksCount?subject=${subject}&source=${encodeURIComponent("app.bsky.feed.like:subject.uri")}`),
-            fetchJson(`${CONSTELLATION}/xrpc/blue.microcosm.links.getBacklinksCount?subject=${subject}&source=${encodeURIComponent("app.bsky.feed.repost:subject.uri")}`),
-            fetchJson(`${CONSTELLATION}/xrpc/blue.microcosm.links.getBacklinksCount?subject=${subject}&source=${encodeURIComponent("app.bsky.feed.post:reply.parent.uri")}`),
-          ]);
-
-          const cLikes = likes?.count ?? 0;
-          const cReposts = reposts?.count ?? 0;
-          const cReplies = replies?.count ?? 0;
-
-          // Only show if there's a difference or data exists
-          if (cLikes || cReposts || cReplies) {
-            el.innerHTML = `
-              <div class="row">
-                <span><span class="source">AppView:</span>
-                  ${post.likeCount} likes &middot; ${post.repostCount} reposts &middot; ${post.replyCount} replies</span>
-              </div>
-              <div class="row">
-                <span><span class="source">Constellation:</span>
-                  ${cLikes} likes &middot; ${cReposts} reposts &middot; ${cReplies} replies</span>
-              </div>
-            `;
-            el.classList.remove("hidden");
-          }
-        } catch (err) {
-          // Constellation is best-effort, fail silently
-        }
-      }
-    }
-
-    function renderEmbed(embed) {
-      if (!embed) return "";
-      if (embed.$type === "app.bsky.embed.images#view") {
-        return `<div class="post-embed">${embed.images.map((img) =>
-          `<img src="${img.thumb}" alt="${escapeHtml(img.alt || "")}" loading="lazy">`
-        ).join("")}</div>`;
-      }
-      if (embed.$type === "app.bsky.embed.external#view" && embed.external) {
-        const ext = embed.external;
-        return `<a class="post-embed post-embed-link" href="${escapeHtml(ext.uri)}" target="_blank">
-          <div class="embed-title">${escapeHtml(ext.title || "")}</div>
-          ${ext.description ? `<div class="embed-desc">${escapeHtml(ext.description)}</div>` : ""}
-        </a>`;
-      }
-      return "";
-    }
-
-    // ── Helpers ──
-
-    async function fetchJson(url) {
-      const res = await fetch(url, {
-        headers: { Accept: "application/json" },
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.message || `HTTP ${res.status}`);
-      }
-      return res.json();
-    }
-
-    function bskyPostUrl(uri) {
-      const m = uri?.match(/^at:\/\/(did:[^/]+)\/app\.bsky\.feed\.post\/(.+)$/);
-      return m ? `https://bsky.app/profile/${m[1]}/post/${m[2]}` : "#";
-    }
-
-    function escapeHtml(str) {
-      const d = document.createElement("div");
-      d.textContent = str;
-      return d.innerHTML;
-    }
-
-    function formatNum(n) {
-      if (n == null) return "0";
-      if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
-      if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-      return String(n);
-    }
-
-    function relativeDate(dateStr) {
-      if (!dateStr) return "";
-      const diff = Date.now() - new Date(dateStr).getTime();
-      const mins = Math.floor(diff / 60000);
-      const hours = Math.floor(diff / 3600000);
-      const days = Math.floor(diff / 86400000);
-      if (mins < 60) return `${mins}m ago`;
-      if (hours < 24) return `${hours}h ago`;
-      if (days < 30) return `${days}d ago`;
-      return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    }
-  </script>
+  $("lookup").addEventListener("submit", (e) => { e.preventDefault(); lookup($("handle").value); });
+  document.querySelectorAll("[data-try]").forEach((b) => b.addEventListener("click", () => { $("handle").value = b.dataset.try; lookup(b.dataset.try); }));
+  for (const id of ["ls", "stype", "skey"]) $(id).addEventListener("change", render);
+</script>
 </body>
 </html>

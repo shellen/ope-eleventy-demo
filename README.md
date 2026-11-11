@@ -16,7 +16,7 @@ ope-blog/              Publisher: an Eleventy blog. Posts are gated at their own
 ope-license-server/    License Server: an OAuth 2.0 authorization server issuing License Tokens
 ope-reader/            Reader apps: a CLI and a browser UI, sharing one client library
 eleventy-plugin-ope/   Plugin: generates OPE metadata and feed Offers for any Eleventy site
-atproto-example/       AT Protocol identity demo (from v0.1; see below)
+atproto-example/       OPE and atproto spaces: how a publisher on atproto could gate posts (prototype)
 ```
 
 ## Quick start
@@ -126,7 +126,22 @@ Both the publisher and the License Server run on Cloudflare Workers (`wrangler.j
 
 ## AT Protocol
 
-[`atproto-example/`](./atproto-example/) is a single-page demo from v0.1. It shows a Bluesky `did:plc` used as a publisher identity and pulls network-wide engagement from [Constellation](https://constellation.microcosm.blue). v0.2 identifies publishers by URL and defers AT Protocol to a future profile (Profile E), so this example is kept for reference and isn't wired into the v0.2 flow.
+[`atproto-example/`](./atproto-example/) shows how a publisher on the AT Protocol could keep subscriber-only posts in an **atproto space**, with the OPE License Server deciding who reads them. Under atproto's `managedspace` policy, a space asks a "managing app" whether each account may read. The License Server is that app, and answers from the reader's OPE subscription. The page is also on the demo blog at `/atproto/`, and the spec's Profile E notes describe the same design.
+
+atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the launch within weeks, and breaking changes still land.
+
+**What works**
+- The License Server is a managing app: it has a `did:web` identity, and answers `checkUserAccess` (the published alpha) and `checkAccess` (the later code), each in its own shape.
+- It checks that each request is signed by the space's owner (atproto service auth), reading the owner's key from `plc.directory` or a `did:web` document, in current or older key formats.
+- Tested against **Bluesky's own spaces-alpha PDS**, run locally (`npm run test:spaces` in `ope-license-server`). The PDS asks the License Server, and issues a space credential only while the reader's subscription is active. It refuses an unsubscribed reader, a cancelled subscription, and an unlinked account.
+- It runs on Cloudflare Workers, alongside the rest of the License Server.
+
+**What doesn't yet**
+- **No hosted space.** It hasn't run against a space on a hosted PDS: the alpha server is invite-only.
+- **Account linking is a stub.** A subscriber types an atproto handle on the License Server's account page, and the link isn't verified. A real version would have them sign in with that account (atproto OAuth).
+- **No reading posts yet.** The tests stop at the License Server's decision and the credential it unlocks. They don't have an app read the space's posts with that credential.
+- **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set.
+- **The API may change.** Method names and shapes are still moving in the alpha.
 
 ## Spec
 

@@ -1,40 +1,42 @@
-# AT Protocol + OPE Identity Demo
+# OPE and atproto spaces
 
-> **From OPE v0.1.** v0.2 identifies publishers by URL and defers AT Protocol to a
-> future profile (Profile E, waiting on atproto spaces). This example is kept for
-> reference and isn't part of the v0.2 flow. Its `publisherId` is a v0.1 concept.
+A single page, with no build step and no dependencies, showing how a publisher on the AT Protocol could keep subscriber-only posts in an **atproto space**, with an **OPE License Server** deciding who may read them. The decision comes from the same subscription that unlocks the publisher's site and every OPE app.
 
-A zero-dependency, single-file demo showing how AT Protocol (Bluesky) identities
-integrate with OPE's portable entitlement model.
+Open `index.html` in a browser, or see it on the demo blog at `/atproto/`.
 
-## What it does
+## What it shows
 
-- Fetches any Bluesky user's profile and recent posts via the **public API** (no auth)
-- Queries **Constellation** (by [Microcosm](https://www.microcosm.blue/)) for
-  network-wide interaction counts from the AT Protocol firehose
-- Shows how a `did:plc` identity maps directly to an OPE `publisherId`
+- **The idea:** a space under atproto's `managedspace` policy hands each "may this account read?" decision to a managing app. The License Server is that app, and answers from the reader's OPE subscription.
+- **A live address builder:** type a publisher's handle. The page resolves their DID (Bluesky's public API) and shows:
+  - the space address: `at://<publisher DID>/space/<type>/<key>`;
+  - a sample record address in the space;
+  - the space's policy, naming the License Server as managing app;
+  - the License Server's matching `OPE_MANAGED_SPACES` setting.
 
-## Run it
+  It also checks that the License Server's `did:web` document resolves.
+- **The flow, step by step,** and what's working versus not yet.
 
-Open `index.html` in a browser. That's it. No build step, no dependencies, no server.
+The License Server side is a working prototype (`ope-license-server/atproto.js`, tested in `ope-license-server/test/atproto.test.js`). See the License Server README.
 
-You can also link directly to a profile: `index.html#jay.bsky.team`
+## Status
 
-## APIs used
+atproto spaces are in alpha (proposal 0016, alpha since August 20, 2026), with breaking changes still landing.
 
-| API | Base URL | Auth | Purpose |
-|-----|----------|------|---------|
-| Bluesky Public AppView | `https://public.api.bsky.app` | None | Profile, posts |
-| Constellation | `https://constellation.microcosm.blue` | None | Firehose-indexed interaction counts |
+**Works:**
+- The License Server answers as a space's managing app, with signatures checked against the space owner's DID key.
+- Tested against Bluesky's own spaces-alpha PDS, run locally (`npm run test:spaces` in `ope-license-server`): a space credential is issued only while the reader's subscription is active.
 
-## Why this matters for OPE
+**Doesn't yet:**
+- a hosted space (the alpha server is invite-only);
+- verified account linking (today a handle is linked without proof; a real version would use atproto OAuth);
+- an app reading the space's posts with the credential;
+- a live License Server configured to manage a space;
+- a stable API.
 
-AT Protocol gives every user a decentralized identifier (`did:plc:...`) that is:
+The previous version of this page (OPE v0.1: a Bluesky `did:plc` as the publisher's identity, plus Constellation engagement counts) is on the `v0.1` branch.
 
-- **Portable** — not locked to any single platform
-- **Cryptographically verifiable** — tied to signing keys the user controls
-- **Already deployed** — millions of Bluesky users have one
+## Sources
 
-This maps perfectly to OPE's `publisherId` field. A publisher who uses Bluesky
-already has everything they need to issue OPE grant tokens — no separate
-identity registration required.
+- [atproto permissioned data proposal (0016)](https://github.com/bluesky-social/proposals/tree/main/0016-permissioned-data)
+- [Spaces alpha announcement](https://atproto.com/blog/atproto-spaces-alpha)
+- [OPE v0.2 draft](https://feedspec.org/ope/spec/0.2/), Profile E

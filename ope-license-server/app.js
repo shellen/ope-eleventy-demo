@@ -42,6 +42,7 @@ import {
   decodeProtectedHeader,
   calculateJwkThumbprint,
 } from "jose";
+import { createSpaceManager, CHECK_ACCESS, CHECK_USER_ACCESS } from "./atproto.js";
 
 const PORT = Number(process.env.PORT || 4000);
 // On Netlify, URL is the site's address; OPE_ISSUER overrides it.
@@ -117,6 +118,7 @@ const grants = new Map(); //        grant id → one app's authorization for one
 const refreshTokens = new Map(); // refresh token → { grantId, current }
 const accessTokens = new Map(); //  jti → { grantId, publisher, revokedReason }
 const issuanceLog = []; //          spec §17.4
+const atprotoLinks = new Map(); //  account → { did, handle } (prototype ATProto profile; see atproto.js)
 const metadataCache = new Map(); // URL → { doc, fetchedAt }
 const termsCache = new Map(); //    URL → { sha256, fetchedAt }
 
@@ -401,7 +403,26 @@ app.use(express.json());
 
 // CORS: public endpoints are callable from any origin, without credentials
 // (Web profile). Apps may be native, extensions, or pages on any origin.
-const PUBLIC_PATHS = ["/.well-known/oauth-authorization-server", "/jwks.json", "/register", "/token", "/revoke"];
+const PUBLIC_PATHS = ["/.well-known/oauth-authorization-server", "/jwks.json", "/register", "/token", "/revoke", "/.well-known/did.json"];
+
+// ── ATProto profile prototype (spec Profile E notes; atproto spaces are alpha) ──
+// OPE_MANAGED_SPACES: [{ "space": "at://<publisher DID>/space/<type>/<skey>", "resource": "<OPE resource>" }]
+// A publisher sets its space's managingApp to this server's did:web#ope_space_manager.
+const MANAGED_SPACES = (() => {
+  try { return JSON.parse(process.env.OPE_MANAGED_SPACES || "[]"); } catch { return []; }
+})();
+let keyResolverOverride = null; // tests supply a resolver instead of fetching DID documents
+const keyResolverOverrideOr = (did, force) => (keyResolverOverride ? keyResolverOverride(did, force) : null);
+const spaceManager = createSpaceManager({
+  issuer: ISSUER,
+  spaces: MANAGED_SPACES,
+  resolveKey: keyResolverOverrideOr,
+  entitled: (did, resource) => {
+    const account = [...atprotoLinks].find(([, link]) => link.did === did)?.[0];
+    return Boolean(account) && (entitlements.get(account) || []).some((e) => e.state === "active" && covers(e, resource));
+  },
+});
+function setAtprotoKeyResolver(fn) { keyResolverOverride = fn; }
 app.use((req, res, next) => {
   if (PUBLIC_PATHS.includes(req.path)) {
     res.set({
@@ -442,6 +463,11 @@ app.get("/.well-known/oauth-authorization-server", (_req, res) => {
 });
 
 app.get("/", (_req, res) => res.redirect(303, "/account"));
+
+// This server's atproto identity, so a space can name it as its managing app.
+app.get("/.well-known/did.json", (_req, res) => res.json(spaceManager.didDocument()));
+app.get(`/xrpc/${CHECK_ACCESS}`, spaceManager.checkAccess);
+app.get(`/xrpc/${CHECK_USER_ACCESS}`, spaceManager.checkAccess);
 
 app.get("/jwks.json", (_req, res) => res.set("Cache-Control", "public, max-age=300").json({ keys: [PUBLIC_JWK] }));
 
@@ -717,7 +743,36 @@ ${ents.length ? ents.map((e) => `<div class="card"><strong>${esc(e.offerName || 
 ${apps.length ? apps.map((g) => `<div class="card"><strong>${esc(clients.get(g.clientId)?.client_name || g.clientId)}</strong><br>
   <span class="muted">${esc(g.resource)}${g.jkt ? " · DPoP-bound" : ""}</span>
   <form method="post" action="/account/disconnect"><input type="hidden" name="grant" value="${esc(g.id)}"><button>Disconnect</button></form></div>`).join("") : `<p class="muted">No apps connected.</p>`}
+<h2>AT Protocol <span class="muted" style="font-size:0.8rem;font-weight:normal">prototype</span></h2>
+${atprotoLinks.get(account)
+  ? `<div class="card"><strong>@${esc(atprotoLinks.get(account).handle)}</strong><br><span class="muted">${esc(atprotoLinks.get(account).did)}</span>
+     <p class="muted">Publishers whose atproto space is managed by this License Server let this account read it while your subscription is active.</p>
+     <form method="post" action="/account/atproto/unlink"><button>Unlink</button></form></div>`
+  : `<p class="muted">Link a Bluesky or other atproto account to read subscriber-only spaces in atproto apps. Demo only: this links the handle you type without signing you in to it; the real version would ask you to sign in with that account.</p>
+     <form method="post" action="/account/atproto/link"><label>Handle <input name="handle" placeholder="you.bsky.social" required></label> <button>Link</button></form>`}
 <form method="post" action="/account/logout"><button>Sign out</button></form>`));
+});
+
+// Link an atproto account (prototype: resolves the handle, doesn't verify control of it).
+app.post("/account/atproto/link", async (req, res) => {
+  const account = sessionAccount(req);
+  if (!account) return res.redirect(303, "/account");
+  const handle = String(req.body.handle || "").trim().replace(/^@/, "").toLowerCase();
+  let did = handle.startsWith("did:") ? handle : null;
+  if (!did) {
+    try {
+      const r = await fetch(`https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`);
+      did = r.ok ? (await r.json()).did : null;
+    } catch { did = null; }
+  }
+  if (did) atprotoLinks.set(account, { did, handle });
+  res.redirect(303, "/account");
+});
+
+app.post("/account/atproto/unlink", (req, res) => {
+  const account = sessionAccount(req);
+  if (account) atprotoLinks.delete(account);
+  res.redirect(303, "/account");
 });
 
 app.post("/account/cancel", (req, res) => {
@@ -746,7 +801,7 @@ app.post("/account/logout", (req, res) => {
 // dropped so the saved state stays small. The metadata and Terms caches aren't
 // saved: they're refetched as needed.
 
-const PERSISTED = { clients, sessions, transactions, codes, entitlements, grants, refreshTokens, accessTokens, seenProofs };
+const PERSISTED = { clients, sessions, transactions, codes, entitlements, grants, refreshTokens, accessTokens, seenProofs, atprotoLinks };
 
 function exportState() {
   const t = now();
@@ -772,4 +827,4 @@ function importState(state) {
   issuanceLog.push(...(state?.issuanceLog || []));
 }
 
-export { app, exportState, importState, issuanceLog, ISSUER, PORT, PROTECTED_RESOURCES, RS_CREDENTIALS };
+export { app, exportState, importState, issuanceLog, ISSUER, PORT, PROTECTED_RESOURCES, RS_CREDENTIALS, spaceManager, setAtprotoKeyResolver };
