@@ -204,9 +204,12 @@ import { createClient, generateDpopKey, pkce, decodeJwt, assetId } from "./ope-c
 // from the publisher's own site (as /reader/), the publisher is this origin.
 const config = await fetch("config.json").then((r) => (r.ok ? r.json() : null)).catch(() => null);
 const publisher = config?.publisher || location.origin;
+// Never send the site's cookies: this is an app with its own tokens. Served from the
+// blog, the browser would otherwise attach the blog's own access cookie (set when you
+// unlock a post on the site itself), and the blog would answer as if this app held it.
 const fetchPublisher = config
-  ? (url, init) => fetch("/proxy?url=" + encodeURIComponent(url), init)
-  : (url, init) => fetch(url, init);
+  ? (url, init) => fetch("/proxy?url=" + encodeURIComponent(url), { ...init, credentials: "omit" })
+  : (url, init) => fetch(url, { ...init, credentials: "omit" });
 const redirectUri = new URL("callback/", location.href).href;
 
 const $ = (id) => document.getElementById(id);
@@ -372,8 +375,15 @@ async function renderUnlockCard(item) {
   box.innerHTML = `<div class="unlock"><p>Checking how to unlock this post…</p></div>`;
   try {
     const found = state.found.get(item.url) || await client.discover(item.url);
-    state.found.set(item.url, found);
     if (state.selected !== item) return;
+    if (!found.resourceMetadata) {
+      // The blog didn't ask for a token, so it didn't say how to get one.
+      box.innerHTML = `<div class="unlock"><p>${found.status === 200
+        ? "The blog served this post without asking this app for access, so there's nothing to unlock here."
+        : `The blog answered ${esc(found.status)} and didn't say how to unlock this post.`}</p></div>`;
+      return;
+    }
+    state.found.set(item.url, found);
     const offers = found.resourceMetadata.ope.offers;
     const price = (o) => o.payment.amount
       ? `$${o.payment.amount}${o.payment.period === "P1M" ? "/mo" : o.payment.period === "P1Y" ? "/yr" : ""}`
