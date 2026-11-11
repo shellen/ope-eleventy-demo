@@ -105,6 +105,10 @@ async function loadFeed() {
       ${item._ope ? `<button data-i="${i}">Read</button>` : ""}</div>`).join("")}
     <label class="inline"><input type="checkbox" id="dpop" checked> Bind the token to a DPoP key</label>`);
   body.querySelectorAll("button[data-i]").forEach((b) => b.onclick = () => discover(feed.items[b.dataset.i]).catch((e) => fail("discover", e)));
+  // Linked from a post's "read it in an app" box: ?post=<url> starts with that post.
+  const wanted = new URLSearchParams(location.search).get("post");
+  const item = wanted && feed.items.find((i) => i._ope && i.url === wanted);
+  if (item) discover(item).catch((e) => fail("discover", e));
 }
 
 // ── 2. Discovery ──

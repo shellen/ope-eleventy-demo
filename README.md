@@ -98,9 +98,31 @@ cd ope-license-server && npm test   # end to end: real publisher, License Server
 
 Not in this demo yet: `limit` Entitlements end to end (the publisher counts them, but the License Server only sells `access`), group Entitlements, bundles, agents, real payment, and persistent storage. A production-grade License Server is tracked in [open-portable-entitlement#11](https://github.com/shellen/open-portable-entitlement/issues/11).
 
+## Put it online: one command
+
+With a Cloudflare account (the free plan is enough):
+
+```bash
+./deploy-cloudflare.sh
+```
+
+It signs you in to Cloudflare in your browser (the only manual step), deploys the License Server and the publisher as two Workers, generates the secret they share, and then runs the reader's full flow against the live sites. When it finishes, it prints your addresses:
+
+```
+Reader app:      https://ope-demo.<your-subdomain>.workers.dev/reader/
+Publisher:       https://ope-demo.<your-subdomain>.workers.dev
+License Server:  https://ope-license-server.<your-subdomain>.workers.dev
+```
+
+Run it again any time to redeploy. The License Server keeps its accounts, subscriptions, and signing key in a Durable Object, so they survive redeploys. Workers deployed by the script aren't connected to GitHub; to redeploy on every push instead, connect each Worker to the repo in the Cloudflare dashboard (Worker → Settings → Build, with path `/ope-license-server` or `/ope-blog`).
+
+### Adding OPE to your own site
+
+You don't run a License Server; someone else does, the way a payment provider does. Your part is the publisher, and `eleventy-plugin-ope` reduces it to four steps: install the plugin, describe your Offers in `ope.config.js`, add the plugin to your Eleventy config, and add a small server entry point (a Cloudflare Worker, a Netlify Function, or one line of Express). See [eleventy-plugin-ope](./eleventy-plugin-ope/).
+
 ## Hosting
 
-Both the publisher and the License Server run on Cloudflare Workers' free plan (`wrangler.jsonc` in each folder) and on Netlify (`netlify.toml`). The hosted demo uses Cloudflare. On Cloudflare the License Server keeps its state and its signing key in a Durable Object, so its only settings are the publisher's scope and the shared introspection secret.
+Both the publisher and the License Server run on Cloudflare Workers (`wrangler.jsonc` in each folder) and on Netlify (`netlify.toml`). The hosted demo uses Cloudflare. On Cloudflare the License Server keeps its state and its signing key in a Durable Object, so its only settings are the publisher's scope and the shared introspection secret. The two Workers call each other over public HTTP, which on a shared `workers.dev` subdomain needs the `global_fetch_strictly_public` compatibility flag; both configs set it.
 
 ## AT Protocol
 
