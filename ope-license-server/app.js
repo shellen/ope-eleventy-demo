@@ -64,6 +64,20 @@ if (process.env.OPE_RS_CLIENT_SECRET) {
   });
 }
 
+// The publisher's own site as a confidential client (spec Web profile): it signs
+// readers in from its server, keeps the token in its own HttpOnly cookie, and
+// authenticates with the same secret it uses for introspection. Registered out of
+// band, so it's defined here rather than in the stored client list.
+const SITE_CLIENTS = new Map([...RS_CREDENTIALS].map(([id, cred]) => [id, {
+  client_id: id,
+  client_name: process.env.OPE_SITE_NAME || "The publisher's site",
+  redirect_uris: cred.publishers.map((p) => `${p.replace(/\/$/, "")}/_ope/callback`),
+  token_endpoint_auth_method: "client_secret_basic",
+  confidential: true,
+  secret: cred.secret,
+}]));
+const getClient = (id) => clients.get(id) || SITE_CLIENTS.get(id);
+
 // ── Signing key (spec §9.3: asymmetric, ES256) ──────────────────────
 // A fresh key each start. Resource Servers refetch /jwks.json on an unknown kid.
 
@@ -372,7 +386,7 @@ ${message ? `<p class="muted">${esc(message)}</p>` : ""}
 // Consent (spec §8.4): the app's name and that it is unreviewed, what is being
 // authorized by Offer name, a link to the Terms, the lifetime, and how to revoke.
 function consentPage(t, account) {
-  const client = clients.get(t.clientId);
+  const client = getClient(t.clientId);
   const ent = activeEntitlementFor(account, t.resource, t.resolved.publisher);
   const terms = (t.resolved.offers[0] && t.resolved.offers[0].terms) || { url: t.resolved.doc.resource_tos_uri };
   const holding = ent
@@ -381,7 +395,9 @@ function consentPage(t, account) {
     : `<div class="card"><strong>You don't have access to this yet.</strong> Choose an offer (demo checkout, no payment):
        <div>${t.resolved.offers.map((o) => `<button class="primary" name="action" value="offer:${esc(o.id)}">${esc(o.name)}${o.payment.amount ? ` ($${esc(o.payment.amount)})` : ""}</button>`).join("")}</div></div>`;
   return page("Allow access", `<h1>${esc(client.client_name || t.clientId)} wants to use your access</h1>
-<div class="card warn"><strong>Unreviewed app.</strong> ${esc(client.client_name || "This app")} registered itself with this License Server and hasn't been reviewed.</div>
+${client.confidential
+  ? `<div class="card"><strong>This is the publisher's own site.</strong> It keeps your access in a cookie on that site, so you can read there.</div>`
+  : `<div class="card warn"><strong>Unreviewed app.</strong> ${esc(client.client_name || "This app")} registered itself with this License Server and hasn't been reviewed.</div>`}
 <p>Publisher: <strong>${esc(t.resolved.doc.resource_name || t.resolved.publisher)}</strong><br>
 <span class="muted">${esc(t.resource)}</span></p>
 <p class="muted">Signed in as ${esc(account)}. Each token lasts 1 hour and refreshes while your access is active.
@@ -506,7 +522,7 @@ app.post("/register", (req, res) => {
 // ── Authorization (spec §8.1): Authorization Code + PKCE, exactly one resource ──
 app.get("/authorize", async (req, res) => {
   const q = req.query;
-  const client = clients.get(q.client_id);
+  const client = getClient(q.client_id);
   // Until the client and redirect URI check out, errors are shown here, never redirected.
   if (!client) return res.status(400).send(page("Error", "<h1>Unknown app</h1>"));
   if (!client.redirect_uris.includes(q.redirect_uri)) {
@@ -543,8 +559,42 @@ app.get("/authorize", async (req, res) => {
     expires: Date.now() + 10 * 60 * 1000,
   });
   const account = sessionAccount(req);
-  res.send(account ? consentPage(transactions.get(id), account) : loginPage(id));
+  if (!account) return res.send(loginPage(id));
+  proceed(transactions.get(id), account, res);
 });
+
+// After sign-in: the publisher's own site gets a code straight away when the reader
+// already has access (it was registered out of band; there's nothing new to consent
+// to). Every other app shows the consent screen.
+function proceed(t, account, res) {
+  if (getClient(t.clientId)?.confidential && activeEntitlementFor(account, t.resource, t.resolved.publisher)) {
+    transactions.delete(t.id);
+    return res.redirect(303, codeRedirect(t, account));
+  }
+  res.send(consentPage(t, account));
+}
+
+function authorizationRedirect(t, params) {
+  const u = new URL(t.redirectUri);
+  for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+  if (t.state) u.searchParams.set("state", t.state);
+  u.searchParams.set("iss", ISSUER); // RFC 9207
+  return u.href;
+}
+
+function codeRedirect(t, account) {
+  const code = token("code_");
+  codes.set(code, {
+    clientId: t.clientId,
+    redirectUri: t.redirectUri,
+    codeChallenge: t.codeChallenge,
+    resource: t.resource,
+    account,
+    expires: now() + CODE_LIFETIME,
+    used: false,
+  });
+  return authorizationRedirect(t, { code });
+}
 
 app.post("/login", (req, res) => {
   const account = String(req.body.account || "").trim().slice(0, 60);
@@ -553,7 +603,7 @@ app.post("/login", (req, res) => {
   sessions.set(sid, account);
   res.set("Set-Cookie", `ope_ls_session=${sid}; HttpOnly; SameSite=Lax; Path=/`);
   const t = transactions.get(req.body.txn);
-  if (t) return res.send(consentPage(t, account));
+  if (t) return proceed(t, account, res);
   res.redirect(303, "/account");
 });
 
@@ -564,13 +614,7 @@ app.post("/consent", (req, res) => {
   if (!account) return res.send(loginPage(t.id));
   transactions.delete(t.id);
 
-  const back = (params) => {
-    const u = new URL(t.redirectUri);
-    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
-    if (t.state) u.searchParams.set("state", t.state);
-    u.searchParams.set("iss", ISSUER); // RFC 9207
-    return res.redirect(303, u.href);
-  };
+  const back = (params) => res.redirect(303, authorizationRedirect(t, params));
 
   const action = String(req.body.action || "");
   if (action === "deny") return back({ error: "access_denied" });
@@ -584,25 +628,30 @@ app.post("/consent", (req, res) => {
     return back({ error: "no_entitlement", error_description: "you hold no Entitlement for this resource" });
   }
 
-  const code = token("code_");
-  codes.set(code, {
-    clientId: t.clientId,
-    redirectUri: t.redirectUri,
-    codeChallenge: t.codeChallenge,
-    resource: t.resource,
-    account,
-    expires: now() + CODE_LIFETIME,
-    used: false,
-  });
-  back({ code });
+  res.redirect(303, codeRedirect(t, account));
 });
 
 // ── Token endpoint (spec §8.5, §12.1) ──
 app.post("/token", async (req, res) => {
   res.set("Cache-Control", "no-store");
   const b = req.body;
-  const client = clients.get(b.client_id);
+  // Confidential clients authenticate with HTTP Basic (or client_secret in the body).
+  const basic = (req.headers.authorization || "").match(/^Basic\s+(.+)$/i);
+  let clientId = b.client_id;
+  let secret = b.client_secret;
+  if (basic) {
+    const [id, pw] = Buffer.from(basic[1], "base64").toString().split(":");
+    clientId = decodeURIComponent(id || "");
+    secret = decodeURIComponent(pw || "");
+  }
+  const client = getClient(clientId);
   if (!client) return oauthError(res, 401, "invalid_client", "unknown client_id");
+  if (client.confidential) {
+    const ok = typeof secret === "string" && secret.length === client.secret.length
+      && timingSafeEqual(Buffer.from(secret), Buffer.from(client.secret));
+    if (!ok) return oauthError(res, 401, "invalid_client", "client authentication failed");
+  }
+  b.client_id = clientId;
 
   // A DPoP proof binds the tokens to the app's key (RFC 9449).
   let jkt = null;
@@ -740,7 +789,7 @@ ${ents.length ? ents.map((e) => `<div class="card"><strong>${esc(e.offerName || 
   <span class="muted">${esc(e.coverage)} ${esc(e.resource)}</span>
   ${e.state === "active" ? `<form method="post" action="/account/cancel"><input type="hidden" name="id" value="${esc(e.id)}"><button>Cancel</button></form>` : ""}</div>`).join("") : `<p class="muted">None yet. Subscribe from any OPE app.</p>`}
 <h2>Connected apps</h2>
-${apps.length ? apps.map((g) => `<div class="card"><strong>${esc(clients.get(g.clientId)?.client_name || g.clientId)}</strong><br>
+${apps.length ? apps.map((g) => `<div class="card"><strong>${esc(getClient(g.clientId)?.client_name || g.clientId)}</strong><br>
   <span class="muted">${esc(g.resource)}${g.jkt ? " · DPoP-bound" : ""}</span>
   <form method="post" action="/account/disconnect"><input type="hidden" name="grant" value="${esc(g.id)}"><button>Disconnect</button></form></div>`).join("") : `<p class="muted">No apps connected.</p>`}
 <h2>AT Protocol <span class="muted" style="font-size:0.8rem;font-weight:normal">prototype</span></h2>

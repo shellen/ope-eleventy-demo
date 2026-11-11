@@ -5,6 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{{ title | default("OPE Demo Blog") }}</title>
   <link rel="alternate" type="application/json" href="/feed.json" title="JSON Feed">
+  <link rel="terms-of-service" href="/terms/">
+  {%- if ope_gated or ope_unlocked %}
+  {#- Paywalled content, marked for search engines (Web profile SHOULD). #}
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":{{ title | dump | safe }},"isAccessibleForFree":false,"hasPart":{"@type":"WebPageElement","isAccessibleForFree":false,"cssSelector":".ope-paywalled"}}</script>
+  {%- endif %}
   <style>
     :root { --text: #1a1a1a; --muted: #666; --bg: #fff; --accent: #2563eb; --border: #e5e7eb; --gated-bg: #fefce8; --gated-border: #fbbf24; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -27,6 +32,7 @@
     .tag { display: inline-block; font-size: 0.75rem; background: #f3f4f6; color: var(--muted); padding: 0.125rem 0.5rem; border-radius: 4px; margin-right: 0.25rem; }
     .tag.gated { background: #fef3c7; color: #92400e; }
     footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); font-size: 0.8rem; color: var(--muted); }
+    .unlocked-note { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 1rem; margin-top: 2rem; }
     .ope-badge { font-size: 0.75rem; background: #eff6ff; color: var(--accent); padding: 0.125rem 0.5rem; border-radius: 4px; font-weight: 500; }
   </style>
 </head>

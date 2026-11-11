@@ -161,8 +161,11 @@ module.exports = function opePlugin(eleventyConfig, config) {
     eleventyConfig.addTemplate(
       "ope-redirects.11ty.js",
       {
-        render: (data) => (data.collections.opeGated || [])
-          .map((post) => `${post.url}  /.netlify/functions/${fn}  200!`).join("\n") + "\n",
+        render: (data) => [
+          // The Web profile's sign-in routes (unlock, callback, leave).
+          `/_ope/*  /.netlify/functions/${fn}  200!`,
+          ...(data.collections.opeGated || []).map((post) => `${post.url}  /.netlify/functions/${fn}  200!`),
+        ].join("\n") + "\n",
       },
       { permalink: "/_redirects", eleventyExcludeFromCollections: true },
     );

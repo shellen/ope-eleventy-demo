@@ -52,6 +52,14 @@ Create a Netlify site from this repository with base directory `ope-license-serv
 
 The function loads its state from Netlify Blobs before each request and saves it after. The save only succeeds if nobody else saved in between; otherwise the request runs again on the fresher state. The response waits for the save, so concurrent requests can't lose a refresh-token rotation.
 
+## The publisher's own site as a client (Web profile)
+
+The publisher's site signs readers in from its own server, as a confidential client. It reuses the publisher's introspection credential (`OPE_RS_CLIENT_ID` and `OPE_RS_CLIENT_SECRET`), so there's nothing extra to configure. Its redirect URI is `<publisher>/_ope/callback`.
+
+- **Token endpoint:** authenticates it with HTTP Basic, and issues an unbound `License` token, since the site keeps it in a cookie.
+- **Consent screen:** says it's the publisher's own site, without the "unreviewed app" warning.
+- **Returning subscribers:** go straight back to the site without a consent step.
+
 ## ATProto profile prototype
 
 A prototype of the spec's future ATProto profile (Profile E notes), built against the atproto spaces alpha (proposal 0016). A publisher with an atproto space under the `managedspace` policy can set the space's `managingApp` to this License Server. The space host then asks the License Server, for each reader, whether they may read. The answer comes from the reader's OPE subscription.

@@ -270,3 +270,105 @@ describe("Introspection (spec §12.4)", () => {
     assert.equal(body.token_type, "DPoP");
   });
 });
+
+// ── Web profile: the blog unlocks its own posts in the browser ──
+// A tiny browser: one cookie jar per origin, redirects followed by hand.
+function jar() {
+  const cookies = new Map();
+  return {
+    header: () => [...cookies].map(([k, v]) => `${k}=${v}`).join("; "),
+    take(res) {
+      for (const c of res.headers.getSetCookie?.() || []) {
+        const [pair, ...attrs] = c.split(/;\s*/);
+        const [k, v] = pair.split(/=(.*)/s);
+        if (attrs.some((a) => /^max-age=0$/i.test(a))) cookies.delete(k); else cookies.set(k, v);
+      }
+    },
+    get: (k) => cookies.get(k),
+    set: (k, v) => cookies.set(k, v),
+  };
+}
+const blogJar = jar();
+const lsJar = jar();
+async function go(url, { method = "GET", body, jar } = {}) {
+  const j = jar || (url.startsWith(LS) ? lsJar : blogJar);
+  const res = await fetch(url, {
+    method, redirect: "manual",
+    headers: { cookie: j.header(), ...(body ? { "content-type": "application/x-www-form-urlencoded" } : {}) },
+    body: body ? new URLSearchParams(body) : undefined,
+  });
+  j.take(res);
+  return res;
+}
+const txnOf = (html) => (html.match(/name="txn" value="([^"]+)"/) || [])[1];
+
+describe("Web profile: unlocking on the blog itself", () => {
+  let callbackUrl;
+
+  it("starts at the blog, signs in at the License Server, and comes back unlocked", async () => {
+    const start = await go(`${SITE}/_ope/unlock?post=${encodeURIComponent("/posts/002-protocol-economics/")}`);
+    assert.equal(start.status, 303);
+    const authorize = start.headers.get("location");
+    assert.ok(authorize.startsWith(`${LS}/authorize?`), authorize);
+    assert.ok(blogJar.get("ope_txn"), "the sign-in in progress is kept in a signed cookie");
+    assert.equal(new URL(authorize).searchParams.get("client_id"), "ope-demo-blog");
+
+    const login = await go(authorize);
+    const consent = await go(`${LS}/login`, { method: "POST", body: { txn: txnOf(await login.text()), account: "webby" } });
+    const consentHtml = await consent.text();
+    assert.match(consentHtml, /publisher's own site/, "the site isn't shown as an unreviewed app");
+    const back = await go(`${LS}/consent`, { method: "POST", body: { txn: txnOf(consentHtml), action: "offer:monthly" } });
+    assert.equal(back.status, 303);
+    callbackUrl = back.headers.get("location");
+    assert.ok(callbackUrl.startsWith(`${SITE}/_ope/callback?`), callbackUrl);
+
+    const done = await go(callbackUrl);
+    assert.equal(done.status, 303);
+    assert.equal(done.headers.get("location"), "/posts/002-protocol-economics/");
+    assert.ok(blogJar.get("ope_access"), "the token is kept in an HttpOnly cookie");
+    const setCookie = done.headers.getSetCookie().find((c) => c.startsWith("ope_access="));
+    assert.match(setCookie, /HttpOnly/);
+    assert.match(setCookie, /SameSite=Lax/);
+  });
+
+  it("serves the full post, and every post the subscription covers, from the cookie", async () => {
+    for (const url of [POST, OTHER_POST]) {
+      const res = await go(url);
+      assert.equal(res.status, 200, url);
+      assert.match(await res.text(), /Unlocked with OPE/);
+    }
+  });
+
+  it("issues the site an unbound token, never usable without its secret", async () => {
+    const claims = decodeJwt(decodeURIComponent(blogJar.get("ope_access")));
+    assert.equal(claims.client_id, "ope-demo-blog");
+    assert.equal(claims.cnf, undefined, "a cookie can't carry a DPoP proof, so the token is unbound");
+    const res = await fetch(`${LS}/token`, { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ grant_type: "authorization_code", client_id: "ope-demo-blog", code: "x" }) });
+    assert.equal(res.status, 401, "the site's client needs its secret");
+  });
+
+  it("skips the consent screen on a return visit", async () => {
+    const start = await go(`${SITE}/_ope/unlock?post=${encodeURIComponent("/posts/005-podcast-open-feeds/")}`);
+    const authorize = await go(start.headers.get("location"));
+    assert.equal(authorize.status, 303, "signed in and subscribed: straight back to the site");
+    assert.ok(authorize.headers.get("location").startsWith(`${SITE}/_ope/callback?`));
+    assert.equal((await go(authorize.headers.get("location"))).status, 303);
+  });
+
+  it("refuses a callback whose signed cookie was tampered with", async () => {
+    const start = await go(`${SITE}/_ope/unlock?post=${encodeURIComponent("/posts/002-protocol-economics/")}`);
+    const authorize = await go(start.headers.get("location"));
+    blogJar.set("ope_txn", blogJar.get("ope_txn").replace(/.$/, (c) => (c === "A" ? "B" : "A")));
+    assert.equal((await go(authorize.headers.get("location"))).status, 400);
+  });
+
+  it("locks the post again when the subscription is cancelled, and drops the cookie", async () => {
+    const account = await (await go(`${LS}/account`)).text();
+    const id = account.match(/name="id" value="([^"]+)"/)[1];
+    await go(`${LS}/account/cancel`, { method: "POST", body: { id } });
+    const res = await go(POST);
+    assert.equal(res.status, 401);
+    assert.match(await res.text(), /Subscribe and read here/, "the preview is back");
+    assert.equal(blogJar.get("ope_access"), undefined, "the dead token's cookie is cleared");
+  });
+});

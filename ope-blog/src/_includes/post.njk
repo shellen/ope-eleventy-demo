@@ -13,18 +13,30 @@ layout: base.njk
     {% if ope_unlocked %} <span class="tag gated">Unlocked with OPE</span>{% elif ope_gated %} <span class="tag gated">Subscribers only</span>{% endif %}
   </div>
 
-  {% if ope_gated %}
+  {% if ope_gated and not ope_unlocked %}
     <div class="content">
       <p>{{ content | opePreview(400) }}</p>
     </div>
     <div class="gated-notice">
       <div class="stats">{{ content | opeWordCount }} words · {{ content | opeReadTime }} min read</div>
       <p style="margin-bottom: 0.75rem">{{ ope_cta | default("Subscribe to read the full post") }}</p>
-      <p style="margin-bottom: 0.75rem; font-size: 0.85rem">Subscribers read it in any app that supports OPE. Try the demo reader: sign in, pick an offer (no payment), and read.</p>
-      <a href="/reader/?post={{ page.url | opeAbsolute | urlencode }}" class="cta">Subscribe and read in the reader app</a>
-      <a href="/subscribe/" style="margin-left: 0.75rem; font-size: 0.85rem">See the offers</a>
+      <p id="unlock-message" style="margin-bottom: 0.75rem; font-size: 0.85rem; color: var(--muted)" hidden></p>
+      <a href="/_ope/unlock?post={{ page.url | urlencode }}" class="cta">Subscribe and read here</a>
+      <p style="margin-top: 0.85rem; font-size: 0.85rem">Already a subscriber? The same button signs you in. Or read it in any OPE app, like the <a href="/reader/?post={{ page.url | opeAbsolute | urlencode }}">demo reader</a>.</p>
     </div>
+    <script>
+      // After a sign-in that didn't unlock the post, say why.
+      (function () {
+        var why = new URLSearchParams(location.search).get("unlock");
+        if (!why) return;
+        var text = { access_denied: "You declined, so the post wasn't unlocked.", no_entitlement: "You don't have a subscription that covers this post yet." }[why] || "The post couldn't be unlocked (" + why + "). Try again.";
+        var el = document.getElementById("unlock-message"); el.textContent = text; el.hidden = false;
+      })();
+    </script>
   {% else %}
-    <div class="content">{{ content | safe }}</div>
+    <div class="content{% if ope_unlocked %} ope-paywalled{% endif %}">{{ content | safe }}</div>
+    {% if ope_unlocked %}
+    <p class="unlocked-note">You're reading with your subscription. <a href="/_ope/leave?post={{ ope_post.url | urlencode }}">Stop reading on this browser</a></p>
+    {% endif %}
   {% endif %}
 </article>
