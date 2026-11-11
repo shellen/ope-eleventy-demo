@@ -78,7 +78,7 @@
     <p class="eyebrow">Open Portable Entitlement · AT Protocol</p>
     <h1>Subscriber-only posts on atproto, with OPE deciding who reads</h1>
     <p class="lede">atproto <strong>spaces</strong> let a publisher keep posts that only some accounts can read. A space can hand each "may this person read?" decision to an outside service. Pointed at an <strong>OPE License Server</strong>, that question becomes "do they have an active subscription?", the same subscription that unlocks the publisher's site and every OPE app.</p>
-    <span class="status">● atproto spaces are in alpha. This is a working prototype, not yet tested against a live space.</span>
+    <span class="status">● atproto spaces are in alpha. The prototype passes against Bluesky's own spaces PDS, run locally, but not yet against a hosted space.</span>
   </header>
 
   <section aria-labelledby="build-h">
@@ -115,17 +115,20 @@
     <div class="panel">
       <h3>Working now</h3>
       <ul>
-        <li>The License Server's <code>checkAccess</code> endpoint, which checks the request's signature against the publisher's DID key, and its <code>did:web</code> identity.</li>
+        <li><b>Tested against Bluesky's own spaces-alpha PDS</b>, run locally: the PDS asks the License Server, and issues a space credential only while the reader is subscribed. It refuses unsubscribed, cancelled, and unlinked readers.</li>
+        <li>The License Server's managing-app endpoint, which checks that each request is signed by the space's owner, and its <code>did:web</code> identity.</li>
         <li>Answers from the same subscriptions the blog and the reader app use.</li>
-        <li>Tests that play the space host: valid, unlinked, cancelled, and forged requests.</li>
+        <li>Runs on Cloudflare Workers with the rest of the License Server.</li>
       </ul>
     </div>
     <div class="panel">
       <h3>Not yet</h3>
       <ul>
-        <li>A test against a real space. The spaces alpha server is invite-only, and the launch is expected within weeks.</li>
-        <li>Real account linking: signing in with the atproto account (atproto OAuth).</li>
-        <li>A stable API. Spaces' method names are still changing: the alpha code says <code>checkAccess</code>, the proposal text <code>checkUserAccess</code>. The prototype answers both.</li>
+        <li><b>A hosted space.</b> The spaces alpha server is invite-only, and the launch is expected within weeks.</li>
+        <li><b>Real account linking.</b> Today you type a handle and it isn't verified; a real version would have you sign in with that account (atproto OAuth).</li>
+        <li><b>Reading the posts.</b> The tests stop once the credential is issued; no app reads the space's posts with it yet.</li>
+        <li><b>Live access.</b> The live License Server doesn't manage any space until it's configured with one.</li>
+        <li><b>A stable API.</b> The alpha has shipped two versions of the call (<code>checkUserAccess</code> and <code>checkAccess</code>). The prototype answers both.</li>
       </ul>
     </div>
   </section>

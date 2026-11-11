@@ -126,9 +126,22 @@ Both the publisher and the License Server run on Cloudflare Workers (`wrangler.j
 
 ## AT Protocol
 
-[`atproto-example/`](./atproto-example/) shows how a publisher on the AT Protocol could keep subscriber-only posts in an **atproto space** (alpha), with the OPE License Server deciding who reads them. Under atproto's `managedspace` policy, a space asks a "managing app" whether each account may read. The License Server is that app, and answers from the reader's OPE subscription.
+[`atproto-example/`](./atproto-example/) shows how a publisher on the AT Protocol could keep subscriber-only posts in an **atproto space**, with the OPE License Server deciding who reads them. Under atproto's `managedspace` policy, a space asks a "managing app" whether each account may read. The License Server is that app, and answers from the reader's OPE subscription. The page is also on the demo blog at `/atproto/`, and the spec's Profile E notes describe the same design.
 
-The License Server side is a working prototype: a `did:web` identity and the `com.atproto.managedspace.checkAccess` endpoint, with tests that play the space host. It isn't tested against a live space yet, and account linking is a stub. The page is also on the demo blog at `/atproto/`. The spec's Profile E notes describe the same design.
+atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the launch within weeks, and breaking changes still land.
+
+**What works**
+- The License Server is a managing app: it has a `did:web` identity, and answers `checkUserAccess` (the published alpha) and `checkAccess` (the later code), each in its own shape.
+- It checks that each request is signed by the space's owner (atproto service auth), reading the owner's key from `plc.directory` or a `did:web` document, in current or older key formats.
+- Tested against **Bluesky's own spaces-alpha PDS**, run locally (`npm run test:spaces` in `ope-license-server`). The PDS asks the License Server, and issues a space credential only while the reader's subscription is active. It refuses an unsubscribed reader, a cancelled subscription, and an unlinked account.
+- It runs on Cloudflare Workers, alongside the rest of the License Server.
+
+**What doesn't yet**
+- **No hosted space.** It hasn't run against a space on a hosted PDS: the alpha server is invite-only.
+- **Account linking is a stub.** A subscriber types an atproto handle on the License Server's account page, and the link isn't verified. A real version would have them sign in with that account (atproto OAuth).
+- **No reading posts yet.** The tests stop at the License Server's decision and the credential it unlocks. They don't have an app read the space's posts with that credential.
+- **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set.
+- **The API may change.** Method names and shapes are still moving in the alpha.
 
 ## Spec
 
