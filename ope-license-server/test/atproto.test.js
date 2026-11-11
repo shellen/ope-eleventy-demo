@@ -83,9 +83,17 @@ describe("ATProto profile prototype: License Server as a space's managing app", 
     assert.deepEqual((await ask({ space: other })).body, { read: false, write: false });
   });
 
-  it("accepts the proposal's checkUserAccess name too", async () => {
+  it("answers the published alpha's checkUserAccess, one access level at a time", async () => {
     seed();
-    const r = await ask({ lxm: "com.atproto.managedspace.checkUserAccess", param: "user" });
+    const read = await ask({ lxm: "com.atproto.managedspace.checkUserAccess", param: "user" });
+    assert.deepEqual(read.body, { authorized: true });
+    seed({ aliceState: "ended" });
+    assert.deepEqual((await ask({ lxm: "com.atproto.managedspace.checkUserAccess", param: "user" })).body, { authorized: false });
+  });
+
+  it("accepts a request addressed to the did#service reference, as a space host sends it", async () => {
+    seed();
+    const r = await ask({ aud: lsApp.spaceManager.managingApp });
     assert.deepEqual(r.body, { read: true, write: false });
   });
 

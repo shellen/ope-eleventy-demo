@@ -9,7 +9,8 @@
     "test": "node --test test/*.test.js && OPE_LS_ENTRY=test/netlify-shim.mjs node --test test/flow.test.js",
     "generate-key": "node scripts/generate-key.mjs",
     "dev:cloudflare": "wrangler dev",
-    "test:cloudflare": "OPE_LS_ENTRY=test/cloudflare-dev.mjs node --test test/flow.test.js"
+    "test:cloudflare": "OPE_LS_ENTRY=test/cloudflare-dev.mjs node --test test/flow.test.js",
+    "test:spaces": "npm --prefix integration install --no-audit --no-fund --silent && node --test integration/spaces.test.js"
   },
   "dependencies": {
     "@atproto/crypto": "^0.5.7",
