@@ -7,6 +7,9 @@
   "main": "cloudflare/worker.mjs",
   "compatibility_date": "2026-11-01",
   "compatibility_flags": ["nodejs_compat"],
+  // Always serve at <name>.<subdomain>.workers.dev, whoever deploys; no per-version preview URLs.
+  "workers_dev": true,
+  "preview_urls": false,
   "durable_objects": {
     "bindings": [{ "name": "LICENSE_SERVER", "class_name": "LicenseServerState" }]
   },
