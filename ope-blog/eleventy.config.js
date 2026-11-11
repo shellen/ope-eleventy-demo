@@ -13,6 +13,8 @@ export default function (eleventyConfig) {
     "../ope-reader/index.html": "reader/index.html",
     "../ope-reader/ope-client.js": "reader/ope-client.js",
     "../ope-reader/callback.html": "reader/callback/index.html",
+    // OPE and atproto spaces explainer, served at /atproto/.
+    "../atproto-example/index.html": "atproto/index.html",
   });
 
   return {

@@ -16,7 +16,7 @@ ope-blog/              Publisher: an Eleventy blog. Posts are gated at their own
 ope-license-server/    License Server: an OAuth 2.0 authorization server issuing License Tokens
 ope-reader/            Reader apps: a CLI and a browser UI, sharing one client library
 eleventy-plugin-ope/   Plugin: generates OPE metadata and feed Offers for any Eleventy site
-atproto-example/       AT Protocol identity demo (from v0.1; see below)
+atproto-example/       OPE and atproto spaces: how a publisher on atproto could gate posts (prototype)
 ```
 
 ## Quick start
@@ -126,7 +126,9 @@ Both the publisher and the License Server run on Cloudflare Workers (`wrangler.j
 
 ## AT Protocol
 
-[`atproto-example/`](./atproto-example/) is a single-page demo from v0.1. It shows a Bluesky `did:plc` used as a publisher identity and pulls network-wide engagement from [Constellation](https://constellation.microcosm.blue). v0.2 identifies publishers by URL and defers AT Protocol to a future profile (Profile E), so this example is kept for reference and isn't wired into the v0.2 flow.
+[`atproto-example/`](./atproto-example/) shows how a publisher on the AT Protocol could keep subscriber-only posts in an **atproto space** (alpha), with the OPE License Server deciding who reads them. Under atproto's `managedspace` policy, a space asks a "managing app" whether each account may read. The License Server is that app, and answers from the reader's OPE subscription.
+
+The License Server side is a working prototype: a `did:web` identity and the `com.atproto.managedspace.checkAccess` endpoint, with tests that play the space host. It isn't tested against a live space yet, and account linking is a stub. The page is also on the demo blog at `/atproto/`. The spec's Profile E notes describe the same design.
 
 ## Spec
 

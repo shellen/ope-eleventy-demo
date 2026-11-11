@@ -52,6 +52,17 @@ Create a Netlify site from this repository with base directory `ope-license-serv
 
 The function loads its state from Netlify Blobs before each request and saves it after. The save only succeeds if nobody else saved in between; otherwise the request runs again on the fresher state. The response waits for the save, so concurrent requests can't lose a refresh-token rotation.
 
+## ATProto profile prototype
+
+A prototype of the spec's future ATProto profile (Profile E notes), built against the atproto spaces alpha (proposal 0016). A publisher with an atproto space under the `managedspace` policy can set the space's `managingApp` to this License Server. The space host then asks the License Server, for each reader, whether they may read. The answer comes from the reader's OPE subscription.
+
+- **Identity:** the server publishes a `did:web` document at `/.well-known/did.json`. Its managing-app reference is `did:web:<host>#ope_space_manager`.
+- **Endpoint:** `GET /xrpc/com.atproto.managedspace.checkAccess?space=<space-ref>&repo=<reader DID>`. It requires atproto service auth from the space's authority (a JWT signed with the authority DID's key, addressed to this server's DID and to this method). It returns `{ "read": <active subscription covering the space>, "write": false }`. The proposal text's name for it, `checkUserAccess`, is answered too.
+- **Configuration:** `OPE_MANAGED_SPACES`, a JSON list of `{ "space": "at://<publisher DID>/space/<type>/<skey>", "resource": "<OPE resource>" }`. Off when unset.
+- **Account linking (stub):** a subscriber links an atproto handle on `/account`. The prototype resolves the handle but doesn't check that the subscriber controls it. A real version would have them sign in with that account (atproto OAuth).
+
+`test/atproto.test.js` plays the space host, signing requests with a generated key pair. Not yet tested against a real space: the spaces alpha server is invite-only, and the public launch is expected within weeks. Spaces' method names are still changing; the alpha code calls this method `checkAccess`.
+
 ## Endpoints
 
 | Endpoint | Spec | What it does |
@@ -64,7 +75,8 @@ The function loads its state from Netlify Blobs before each request and saves it
 | `POST /token` | §8.5, §9, §12.1 | Code exchange and refresh. A DPoP proof binds the token (`cnf.jkt`); the response includes `resource` and `entitlement` |
 | `POST /revoke` | §12.2, RFC 7009 | Revoking a refresh token ends the whole authorization |
 | `POST /introspect` | §12.4, RFC 7662 | Basic auth with a publisher's credential, for its own tokens only. Answers `permitted` for a `resource`, and `revocation_reason` when inactive |
-| `GET /account` | §17 | Your subscriptions (cancel) and connected apps (disconnect) |
+| `GET /account` | §17 | Your subscriptions (cancel) and connected apps (disconnect); link an atproto account (prototype) |
+| `GET /.well-known/did.json`, `GET /xrpc/com.atproto.managedspace.checkAccess` | Profile E (notes) | The ATProto profile prototype, above |
 
 ## What a token looks like
 
