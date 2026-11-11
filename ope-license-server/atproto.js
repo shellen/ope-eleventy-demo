@@ -5,7 +5,7 @@
 // asks its managing app, for each reader, whether they may read or write. Here the
 // answer comes from the reader's OPE Entitlement. See the spec's Profile E notes.
 
-import { verifySignature } from "@atproto/crypto";
+import { verifySignature, formatDidKey, multibaseToBytes, parseMultikey, P256_JWT_ALG, SECP256K1_JWT_ALG } from "@atproto/crypto";
 
 export const CHECK_ACCESS = "com.atproto.managedspace.checkAccess";
 // The proposal text calls it checkUserAccess; answer both while the alpha settles.
@@ -19,17 +19,30 @@ export async function resolveAtprotoKey(did, forceRefresh = false) {
   const hit = keyCache.get(did);
   if (hit && !forceRefresh && Date.now() - hit.at < 3600 * 1000) return hit.key;
   let url;
-  if (did.startsWith("did:plc:")) url = `https://plc.directory/${did}`;
+  // OPE_PLC_URL: the PLC directory to resolve did:plc against (a test network's, say).
+  if (did.startsWith("did:plc:")) url = `${(process.env.OPE_PLC_URL || "https://plc.directory").replace(/\/$/, "")}/${did}`;
   else if (did.startsWith("did:web:")) url = `https://${decodeURIComponent(did.slice(8))}/.well-known/did.json`;
   else throw new Error(`unsupported DID method: ${did}`);
   const res = await fetch(url);
   if (!res.ok) throw new Error(`could not resolve ${did} (HTTP ${res.status})`);
   const doc = await res.json();
   const vm = (doc.verificationMethod || []).find((m) => m.id === `${did}#atproto` || m.id === "#atproto");
-  if (!vm || vm.type !== "Multikey" || !vm.publicKeyMultibase) throw new Error(`${did} has no atproto Multikey`);
-  const key = `did:key:${vm.publicKeyMultibase}`;
+  const key = vm?.publicKeyMultibase && didKeyFromVerificationMethod(vm);
+  if (!key) throw new Error(`${did} has no usable atproto signing key`);
   keyCache.set(did, { key, at: Date.now() });
   return key;
+}
+
+// A verification method as a did:key: the current Multikey form, or the older
+// secp256k1 / P-256 2019 types some directories still publish (as @atproto/identity does).
+function didKeyFromVerificationMethod(vm) {
+  if (vm.type === "Multikey") {
+    const { jwtAlg, keyBytes } = parseMultikey(vm.publicKeyMultibase);
+    return formatDidKey(jwtAlg, keyBytes);
+  }
+  if (vm.type === "EcdsaSecp256k1VerificationKey2019") return formatDidKey(SECP256K1_JWT_ALG, multibaseToBytes(vm.publicKeyMultibase));
+  if (vm.type === "EcdsaSecp256r1VerificationKey2019") return formatDidKey(P256_JWT_ALG, multibaseToBytes(vm.publicKeyMultibase));
+  return null;
 }
 
 // ── Inter-service auth (atproto "service auth" JWTs) ──
@@ -51,7 +64,8 @@ export async function verifyServiceJwt(jwt, { aud, lxm, getKey }) {
   }
   if (["at+jwt", "refresh+jwt", "dpop+jwt"].includes(header.typ)) throw new Error(`invalid jwt type "${header.typ}"`);
   if (!(Date.now() / 1000 < payload.exp)) throw new Error("jwt expired");
-  if (payload.aud !== aud) throw new Error("jwt audience does not match this service");
+  // Addressed to this service: its DID, or the did#serviceId reference a space names.
+  if (![].concat(aud).includes(payload.aud)) throw new Error("jwt audience does not match this service");
   if (payload.lxm !== lxm) throw new Error(`jwt lexicon method must be ${lxm}`);
   if (typeof payload.iss !== "string" || !/^did:[a-z]+:[^#]+(#.+)?$/.test(payload.iss)) throw new Error("jwt iss is not a DID");
   const msg = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
@@ -98,7 +112,9 @@ export function createSpaceManager({ issuer, spaces, entitled, resolveKey }) {
     };
   }
 
-  // Express handler for both method names.
+  // Express handler for both method names. The alpha has shipped two shapes:
+  //   checkUserAccess (published alpha):  ?space&user&access=read|write → { authorized }
+  //   checkAccess (later code):           ?space&repo                   → { read, write }
   async function checkAccess(req, res) {
     const lxm = req.path.endsWith(CHECK_USER_ACCESS) ? CHECK_USER_ACCESS : CHECK_ACCESS;
     const space = String(req.query.space || "");
@@ -114,7 +130,7 @@ export function createSpaceManager({ issuer, spaces, entitled, resolveKey }) {
     const jwt = (req.headers.authorization || "").replace(/^Bearer\s+/i, "");
     let payload;
     try {
-      payload = await verifyServiceJwt(jwt, { aud: did, lxm, getKey });
+      payload = await verifyServiceJwt(jwt, { aud: [did, `${did}#${SERVICE_ID}`], lxm, getKey });
     } catch (e) {
       return res.status(401).json({ error: "AuthenticationRequired", message: e.message });
     }
@@ -125,6 +141,7 @@ export function createSpaceManager({ issuer, spaces, entitled, resolveKey }) {
     // Unknown spaces get no access rather than an error, so a misconfiguration fails closed.
     const read = Boolean(managed) && (await entitled(reader, managed.resource));
     // Subscribers read; only the publisher (the space authority, always authorized) writes.
+    if (lxm === CHECK_USER_ACCESS) return res.json({ authorized: req.query.access === "write" ? false : read });
     res.json({ read, write: false });
   }
 

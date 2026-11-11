@@ -61,7 +61,20 @@ A prototype of the spec's future ATProto profile (Profile E notes), built agains
 - **Configuration:** `OPE_MANAGED_SPACES`, a JSON list of `{ "space": "at://<publisher DID>/space/<type>/<skey>", "resource": "<OPE resource>" }`. Off when unset.
 - **Account linking (stub):** a subscriber links an atproto handle on `/account`. The prototype resolves the handle but doesn't check that the subscriber controls it. A real version would have them sign in with that account (atproto OAuth).
 
-`test/atproto.test.js` plays the space host, signing requests with a generated key pair. Not yet tested against a real space: the spaces alpha server is invite-only, and the public launch is expected within weeks. Spaces' method names are still changing; the alpha code calls this method `checkAccess`.
+Tested two ways:
+
+- **`test/atproto.test.js`** plays the space host, signing requests with a generated key pair.
+- **`npm run test:spaces`** runs the License Server against **Bluesky's own spaces-alpha PDS**, in-process, using `@atproto/dev-env`. The test creates a publisher's managed space naming this server as managing app. The PDS resolves our `did:web`, calls `checkUserAccess` with the publisher's service auth, and issues a space credential only while the reader's subscription is active. It lives in `integration/`, with its own dependencies (about 460 MB), so the normal install and Cloudflare builds don't carry them. Its `package.json` pins every `@atproto` package to the alpha snapshot, because the snapshot's version ranges also match a broken `@atproto/lex@0.0.0` placeholder.
+
+The alpha has shipped two versions of this call, and the server answers both:
+
+| | Published alpha (Nov 5) | Later code (Nov 10) |
+|---|---|---|
+| Method | `checkUserAccess` | `checkAccess` |
+| Parameters | `space`, `user`, `access` (read or write), `clientId` | `space`, `repo`, `clientId` |
+| Answer | `{ "authorized": … }` | `{ "read": …, "write": … }` |
+
+A space host addresses its service auth to the managing app's `did#ope_space_manager` reference. DID keys are read in both the current Multikey form and the older 2019 key types. `OPE_PLC_URL` sets the PLC directory (default `https://plc.directory`). No test yet against a live, hosted space: the alpha server is invite-only, and the public launch is expected within weeks.
 
 ## Endpoints
 
