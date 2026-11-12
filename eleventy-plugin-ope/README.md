@@ -5,7 +5,7 @@ Add [Open Portable Entitlement v0.2](https://feedspec.org/ope/spec/0.2/) to an E
 The plugin does two jobs:
 
 - **At build time** it publishes what apps read to find out how to get access: OAuth Protected Resource metadata (RFC 9728), your Offers in the feed, and the routing for gated posts.
-- **At request time** it serves gated posts: a preview and a `402` without a valid token, the full post with one. It runs as a Netlify Function or as Express middleware.
+- **At request time** it serves gated posts: a preview and a `402` without a valid token, the full post with one. It runs in a Cloudflare Worker, as a Netlify Function, or as Express middleware. It can also let readers subscribe and read on your site itself (the Web profile).
 
 ## Setup: four steps
 
@@ -121,7 +121,7 @@ In your layout, link the button to `/_ope/unlock?post={{ page.url | urlencode }}
 
 ## Where full posts live
 
-Full posts are never part of the published site. The plugin renders them during the build, moves them with their previews into `.ope/content.json`, and deletes them from the output folder. That file is bundled into the Netlify Function, or read by the Express middleware. A static host has nothing secret to serve, however a request path is spelled. Add `.ope/` to `.gitignore`.
+Full posts are never part of the published site. The plugin renders them during the build, moves them with their previews into `.ope/content.json`, and deletes them from the output folder. That file is bundled into the Cloudflare Worker or the Netlify Function, or read by the Express middleware. A static host has nothing secret to serve, however a request path is spelled. Add `.ope/` to `.gitignore`.
 
 ## Selling a single post too
 

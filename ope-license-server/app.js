@@ -43,6 +43,7 @@ import {
   calculateJwkThumbprint,
 } from "jose";
 import { createSpaceManager, CHECK_ACCESS, CHECK_USER_ACCESS } from "./atproto.js";
+import { startLink, finishLink, clientFor, clientMetadata } from "./atproto-oauth.js";
 
 const PORT = Number(process.env.PORT || 4000);
 // On Netlify, URL is the site's address; OPE_ISSUER overrides it.
@@ -133,6 +134,7 @@ const refreshTokens = new Map(); // refresh token → { grantId, current }
 const accessTokens = new Map(); //  jti → { grantId, publisher, revokedReason }
 const issuanceLog = []; //          spec §17.4
 const atprotoLinks = new Map(); //  account → { did, handle } (prototype ATProto profile; see atproto.js)
+const atprotoTxns = new Map();  //  state → { account, …sign-in in progress } (atproto-oauth.js)
 const metadataCache = new Map(); // URL → { doc, fetchedAt }
 const termsCache = new Map(); //    URL → { sha256, fetchedAt }
 
@@ -794,28 +796,58 @@ ${apps.length ? apps.map((g) => `<div class="card"><strong>${esc(getClient(g.cli
   <form method="post" action="/account/disconnect"><input type="hidden" name="grant" value="${esc(g.id)}"><button>Disconnect</button></form></div>`).join("") : `<p class="muted">No apps connected.</p>`}
 <h2>AT Protocol <span class="muted" style="font-size:0.8rem;font-weight:normal">prototype</span></h2>
 ${atprotoLinks.get(account)
-  ? `<div class="card"><strong>@${esc(atprotoLinks.get(account).handle)}</strong><br><span class="muted">${esc(atprotoLinks.get(account).did)}</span>
+  ? `<div class="card"><strong>@${esc(atprotoLinks.get(account).handle)}</strong><br><span class="muted">${esc(atprotoLinks.get(account).did)} · signed in to link</span>
      <p class="muted">Publishers whose atproto space is managed by this License Server let this account read it while your subscription is active.</p>
      <form method="post" action="/account/atproto/unlink"><button>Unlink</button></form></div>`
-  : `<p class="muted">Link a Bluesky or other atproto account to read subscriber-only spaces in atproto apps. Demo only: this links the handle you type without signing you in to it; the real version would ask you to sign in with that account.</p>
-     <form method="post" action="/account/atproto/link"><label>Handle <input name="handle" placeholder="you.bsky.social" required></label> <button>Link</button></form>`}
+  : `${req.query.atproto_error ? `<p class="error">${esc(req.query.atproto_error)}</p>` : ""}
+     <p class="muted">Link a Bluesky or other atproto account to read subscriber-only spaces in atproto apps. You'll sign in with that account to prove it's yours; this License Server only learns its DID, and can't post or read anything as you.</p>
+     <p class="muted">Atproto DIDs are public. When an atproto app asks a publisher's space for access, the publisher sees which account is reading.</p>
+     <form method="post" action="/account/atproto/link"><label>Handle <input name="handle" placeholder="you.bsky.social" required></label> <button>Sign in to link</button></form>`}
 <form method="post" action="/account/logout"><button>Sign out</button></form>`));
 });
 
-// Link an atproto account (prototype: resolves the handle, doesn't verify control of it).
+// Link an atproto account by signing in with it (atproto OAuth; see atproto-oauth.js).
 app.post("/account/atproto/link", async (req, res) => {
   const account = sessionAccount(req);
   if (!account) return res.redirect(303, "/account");
-  const handle = String(req.body.handle || "").trim().replace(/^@/, "").toLowerCase();
-  let did = handle.startsWith("did:") ? handle : null;
-  if (!did) {
-    try {
-      const r = await fetch(`https://public.api.bsky.app/xrpc/com.atproto.identity.resolveHandle?handle=${encodeURIComponent(handle)}`);
-      did = r.ok ? (await r.json()).did : null;
-    } catch { did = null; }
+  try {
+    const { url, state, txn } = await startLink({ issuer: ISSUER, input: req.body.handle });
+    for (const [k, t] of atprotoTxns) if (Date.now() - t.at > 10 * 60 * 1000) atprotoTxns.delete(k);
+    atprotoTxns.set(state, { ...txn, account });
+    res.redirect(303, url);
+  } catch (e) {
+    res.redirect(303, `${ISSUER}/account?atproto_error=${encodeURIComponent(e.message)}`);
   }
-  if (did) atprotoLinks.set(account, { did, handle });
-  res.redirect(303, "/account");
+});
+
+// The redirect back from the account's authorization server. The transaction (found by
+// `state`) says which OPE account started it. The browser must still be signed in as
+// that account, so nobody can send someone else a sign-in link that attaches their
+// atproto account to the sender's. The one exception is a local run, whose callback
+// lands on 127.0.0.1 (atproto's rule for loopback clients), where the session cookie
+// for localhost isn't sent.
+app.get("/account/atproto/callback", async (req, res) => {
+  const txn = atprotoTxns.get(String(req.query.state || ""));
+  if (!txn) return res.redirect(303, `${ISSUER}/account?atproto_error=${encodeURIComponent("unknown or expired sign-in; try again")}`);
+  atprotoTxns.delete(String(req.query.state));
+  const current = sessionAccount(req);
+  if (current ? current !== txn.account : !clientFor(ISSUER).loopback) {
+    return res.redirect(303, `${ISSUER}/account?atproto_error=${encodeURIComponent("this sign-in was started from a different account")}`);
+  }
+  try {
+    const { did, handle } = await finishLink({ issuer: ISSUER, txn, query: req.query });
+    // One OPE account per atproto account: linking here unlinks it elsewhere.
+    for (const [acct, link] of atprotoLinks) if (link.did === did) atprotoLinks.delete(acct);
+    atprotoLinks.set(txn.account, { did, handle });
+    res.redirect(303, `${ISSUER}/account`);
+  } catch (e) {
+    res.redirect(303, `${ISSUER}/account?atproto_error=${encodeURIComponent(e.message)}`);
+  }
+});
+
+// Client metadata for atproto OAuth: the client_id of a deployed License Server.
+app.get("/oauth/atproto-client-metadata.json", (_req, res) => {
+  res.set("Cache-Control", "public, max-age=600").json(clientMetadata(ISSUER, "OPE License Server"));
 });
 
 app.post("/account/atproto/unlink", (req, res) => {
@@ -850,7 +882,7 @@ app.post("/account/logout", (req, res) => {
 // dropped so the saved state stays small. The metadata and Terms caches aren't
 // saved: they're refetched as needed.
 
-const PERSISTED = { clients, sessions, transactions, codes, entitlements, grants, refreshTokens, accessTokens, seenProofs, atprotoLinks };
+const PERSISTED = { clients, sessions, transactions, codes, entitlements, grants, refreshTokens, accessTokens, seenProofs, atprotoLinks, atprotoTxns };
 
 function exportState() {
   const t = now();
