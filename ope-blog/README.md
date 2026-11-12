@@ -19,6 +19,8 @@ ope.config.js          Scope, Offers, Terms, and which License Servers may issue
 src/posts/*.md         Posts. ope_gated: true gates one; ope_offers adds Offers of its own
 eleventy.config.js     Adds eleventy-plugin-ope with ope.config.js
 server.js              Local server: the plugin's Express middleware, then static files
+cloudflare/worker.mjs  The Cloudflare Worker: static assets, with gated posts sent through the plugin
+wrangler.jsonc         The Worker's settings: assets folder, build command, compatibility flags
 functions/ope.mjs      The Netlify Function: three imports and one line, from the plugin
 ```
 
@@ -34,6 +36,7 @@ The build writes:
 | `.ope/content.json` | Outside `_site`: full posts and previews, read by the server or bundled into the function |
 | `/terms/` | The Terms. Tokens carry its SHA-256 digest |
 | `/reader/` | The browser reader from `../ope-reader`, as static files |
+| `/atproto/` | The OPE and atproto spaces page from `../atproto-example` |
 
 ## Subscribing and reading on the blog
 

@@ -78,7 +78,7 @@
     <p class="eyebrow">Open Portable Entitlement · AT Protocol</p>
     <h1>Subscriber-only posts on atproto, with OPE deciding who reads</h1>
     <p class="lede">atproto <strong>spaces</strong> let a publisher keep posts that only some accounts can read. A space can hand each "may this person read?" decision to an outside service. Pointed at an <strong>OPE License Server</strong>, that question becomes "do they have an active subscription?", the same subscription that unlocks the publisher's site and every OPE app.</p>
-    <span class="status">● atproto spaces are in alpha. The prototype passes against Bluesky's own spaces PDS, run locally, but not yet against a hosted space.</span>
+    <span class="status">● atproto spaces are in alpha. The whole path, from signing in to reading posts, passes against Bluesky's own spaces PDS run locally. It hasn't run against a hosted space yet.</span>
   </header>
 
   <section aria-labelledby="build-h">
@@ -103,11 +103,11 @@
     <h2 id="flow-h">How a subscriber reads</h2>
     <ol class="flow">
       <li><div><b>Subscribe once <span class="who ope">OPE</span></b><p>At the publisher's License Server, from the blog or from any OPE app. It's the same subscription the rest of the demo uses.</p></div></li>
-      <li><div><b>Link an atproto account <span class="who ope">OPE</span></b><p>On the License Server's account page, the subscriber links their Bluesky (or other atproto) account. In the prototype this resolves the handle; a real version would have them sign in with it.</p></div></li>
+      <li><div><b>Link an atproto account <span class="who ope">OPE</span></b><p>On the License Server's account page, the subscriber signs in with their Bluesky (or other atproto) account. The License Server asks only for their identity: it learns the account's DID, and can't post or read as them.</p></div></li>
       <li><div><b>Open the space in an atproto app <span class="who sky">atproto</span></b><p>The app gets a short-lived delegation token from the subscriber's own server, then asks the space's host for a space credential.</p></div></li>
       <li><div><b>The space asks the License Server <span class="who sky">atproto</span> <span class="who ope">OPE</span></b><p>The space's policy is <code>managedspace</code>, with the License Server as its managing app. The host calls <code>checkAccess</code> for this subscriber's DID, signed with the publisher's key.</p></div></li>
       <li><div><b>The License Server answers from the subscription <span class="who ope">OPE</span></b><p><code>{"read": true, "write": false}</code> while the subscription is active. Subscribers read; only the publisher writes.</p></div></li>
-      <li><div><b>The app reads the posts <span class="who sky">atproto</span></b><p>With a space credential valid for 10 minutes (60 at most), bound to the app's key. When the subscription ends, the License Server answers no, and access lapses as credentials expire, within the hour OPE allows.</p></div></li>
+      <li><div><b>The app reads the posts <span class="who sky">atproto</span></b><p>With a space credential valid for 10 minutes (60 at most), bound to the app's key: each request is signed with that key. When the subscription ends, the License Server answers no to the next request for a credential. Only the publisher's server can cancel a credential early, so one already issued lasts until it expires, within the hour OPE allows.</p></div></li>
     </ol>
   </section>
 
@@ -115,7 +115,8 @@
     <div class="panel">
       <h3>Working now</h3>
       <ul>
-        <li><b>Tested against Bluesky's own spaces-alpha PDS</b>, run locally: the PDS asks the License Server, and issues a space credential only while the reader is subscribed. It refuses unsubscribed, cancelled, and unlinked readers.</li>
+        <li><b>The whole path, tested against Bluesky's own spaces-alpha PDS</b> run locally: the subscriber signs in on the PDS's own page to link their account, the publisher writes posts into the space, the PDS asks the License Server, and an app reads the posts with the credential it gets. Unsubscribed, cancelled, and unlinked readers are refused.</li>
+        <li><b>Account linking by signing in</b> (atproto OAuth, identity only). The License Server checks that the server vouching for the account is the one its own PDS names.</li>
         <li>The License Server's managing-app endpoint, which checks that each request is signed by the space's owner, and its <code>did:web</code> identity.</li>
         <li>Answers from the same subscriptions the blog and the reader app use.</li>
         <li>Runs on Cloudflare Workers with the rest of the License Server.</li>
@@ -125,10 +126,10 @@
       <h3>Not yet</h3>
       <ul>
         <li><b>A hosted space.</b> The spaces alpha server is invite-only, and the launch is expected within weeks.</li>
-        <li><b>Real account linking.</b> Today you type a handle and it isn't verified; a real version would have you sign in with that account (atproto OAuth).</li>
-        <li><b>Reading the posts.</b> The tests stop once the credential is issued; no app reads the space's posts with it yet.</li>
-        <li><b>Live access.</b> The live License Server doesn't manage any space until it's configured with one.</li>
-        <li><b>A stable API.</b> The alpha has shipped two versions of the call (<code>checkUserAccess</code> and <code>checkAccess</code>). The prototype answers both.</li>
+        <li><b>Live access.</b> The live License Server doesn't manage any space until it's configured with one, and there's no hosted space to configure yet.</li>
+        <li><b>A reader app for spaces.</b> The test plays the app. The demo's reader app doesn't open atproto spaces.</li>
+        <li><b>Early cancellation.</b> Only the publisher's server can cancel a credential before it expires; the License Server can't ask it to yet.</li>
+        <li><b>A stable API.</b> The published alpha calls it <code>checkUserAccess</code>; Bluesky's newer code calls it <code>checkAccess</code>, with a different answer. The License Server answers both.</li>
       </ul>
     </div>
   </section>

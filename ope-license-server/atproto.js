@@ -114,15 +114,17 @@ export function createSpaceManager({ issuer, spaces, entitled, resolveKey }) {
 
   // Express handler for both method names. The alpha has shipped two shapes:
   //   checkUserAccess (published alpha):  ?space&user&access=read|write → { authorized }
-  //   checkAccess (later code):           ?space&repo                   → { read, write }
+  //   checkAccess (Bluesky's integration branch since November 2026):
+  //                                       ?space[&repo][&clientId]      → { read, write }
+  // repo is absent for an anonymous read, clientId for writes.
   async function checkAccess(req, res) {
     const lxm = req.path.endsWith(CHECK_USER_ACCESS) ? CHECK_USER_ACCESS : CHECK_ACCESS;
     const space = String(req.query.space || "");
     const reader = String(req.query.repo || req.query.user || "");
     const ref = parseSpaceRef(space);
     const managed = spaces.find((s) => s.space === space);
-    if (!ref || !reader.startsWith("did:")) {
-      return res.status(400).json({ error: "InvalidRequest", message: "space (a space-ref) and repo (a DID) are required" });
+    if (!ref || (reader && !reader.startsWith("did:"))) {
+      return res.status(400).json({ error: "InvalidRequest", message: "space must be a space-ref, and repo a DID" });
     }
 
     // Service auth: a JWT from the space's authority, addressed to this service
@@ -139,7 +141,8 @@ export function createSpaceManager({ issuer, spaces, entitled, resolveKey }) {
     }
 
     // Unknown spaces get no access rather than an error, so a misconfiguration fails closed.
-    const read = Boolean(managed) && (await entitled(reader, managed.resource));
+    // An anonymous read (no repo) gets nothing: OPE spaces are for subscribers.
+    const read = Boolean(managed) && Boolean(reader) && (await entitled(reader, managed.resource));
     // Subscribers read; only the publisher (the space authority, always authorized) writes.
     if (lxm === CHECK_USER_ACCESS) return res.json({ authorized: req.query.access === "write" ? false : read });
     res.json({ read, write: false });

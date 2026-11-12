@@ -111,9 +111,35 @@ describe("ATProto profile prototype: License Server as a space's managing app", 
     assert.equal((await ask({ auth: false })).status, 401, "no token");
   });
 
-  it("requires a space-ref and a DID", async () => {
+  it("requires a space-ref, and a DID when a repo is given", async () => {
     seed();
     assert.equal((await ask({ space: "not-a-space" })).status, 400);
+    assert.equal((await ask({ repo: "alice.test" })).status, 400);
+  });
+
+  it("gives an anonymous read (no repo) no access", async () => {
+    seed();
+    const { status, body } = await ask({ repo: "" });
+    assert.equal(status, 200);
+    assert.deepEqual(body, { read: false, write: false });
+  });
+
+  it("refuses to finish a link in a browser signed in as a different account", async () => {
+    seed();
+    const saved = lsApp.exportState();
+    saved.maps.sessions = [["sid_mallory", "mallory"]];
+    saved.maps.atprotoTxns = [["state1", { account: "alice", did: "did:plc:x", at: Date.now() }]];
+    lsApp.importState(saved);
+    const res = await fetch(`${BASE}/account/atproto/callback?state=state1&code=c&iss=x`, { headers: { cookie: "ope_ls_session=sid_mallory" }, redirect: "manual" });
+    assert.equal(res.status, 303);
+    assert.match(decodeURIComponent(res.headers.get("location")), /started from a different account/);
+    assert.deepEqual(lsApp.exportState().maps.atprotoLinks, [["alice", ALICE]], "links unchanged");
+  });
+
+  it("refuses an unknown or replayed sign-in", async () => {
+    seed();
+    const res = await fetch(`${BASE}/account/atproto/callback?state=nope&code=c`, { redirect: "manual" });
+    assert.match(decodeURIComponent(res.headers.get("location")), /unknown or expired/);
   });
 
   it("saves account links with the rest of the state", () => {

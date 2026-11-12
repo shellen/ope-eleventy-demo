@@ -1,6 +1,8 @@
 # OPE Demo Suite
 
-Running code for every role in [Open Portable Entitlement (OPE)](https://feedspec.org/ope/spec/0.2/): a publisher, a License Server, and two reader apps. Start them all with one command, then watch a subscription made in one place unlock a post in any app.
+Running code for every role in [Open Portable Entitlement (OPE)](https://feedspec.org/ope/spec/0.2/): a publisher, a License Server, and two reader apps. Start them all with one command, then watch a subscription made in one place unlock a post on the blog itself and in any app.
+
+**See it live:** the [demo blog](https://ope-demo.jason-e0e.workers.dev), its [reader app](https://ope-demo.jason-e0e.workers.dev/reader/), and a [walkthrough with screenshots](https://feedspec.org/ope/demo/).
 
 Aligned with **OPE spec v0.2** (proposed, open for comment). The v0.1 demo lives on the [`v0.1` branch](../../tree/v0.1).
 
@@ -11,7 +13,8 @@ A reader subscribes to a publisher once, wherever they like. Any app they use (a
 ## What's in this repo
 
 ```
-run-demo.sh            One command: install, build, and start everything
+run-demo.sh            One command: install, build, and start everything locally
+deploy-cloudflare.sh   One command: put the publisher and the License Server online
 ope-blog/              Publisher: an Eleventy blog. Posts are gated at their own URLs
 ope-license-server/    License Server: an OAuth 2.0 authorization server issuing License Tokens
 ope-reader/            Reader apps: a CLI and a browser UI, sharing one client library
@@ -68,20 +71,34 @@ The steps match [Appendix B](https://feedspec.org/ope/spec/0.2/#appendix-b-imple
 
 **Two ways to read.** On the blog itself, "Subscribe and read here" signs you in at the License Server and unlocks the post in your browser (the spec's Web profile). In any OPE app, the same subscription unlocks the same posts; the demo's reader app is at `/reader/`.
 
-**[ope-blog](./ope-blog/)**: An Eleventy blog with one scope (`/posts/`) and two subscription Offers. One post is also sold on its own, so it gets per-URL metadata. A gated post's URL serves a preview with a `402` until a request carries a valid token, then serves the full post. The blog itself has almost no OPE code: a config file, one plugin line, and a three-line Netlify Function. The checks live in the plugin.
+**[ope-blog](./ope-blog/)**: An Eleventy blog with one scope (`/posts/`) and two subscription Offers. One post is also sold on its own, so it gets per-URL metadata. A gated post's URL serves a preview with a `402` until a request carries a valid token, or the blog's own access cookie, then serves the full post. The blog itself has almost no OPE code: a config file, one plugin line, and a small server entry point (a Cloudflare Worker, a Netlify Function, or Express). The checks live in the plugin.
 
-**[ope-license-server](./ope-license-server/)**: One readable file. Dynamic client registration, Authorization Code with PKCE for exactly one resource, DPoP-bound ES256 tokens, pairwise subject identifiers, refresh rotation where a replayed refresh token revokes the grant, RFC 7009 revocation, and RFC 7662 introspection that a publisher can only use for its own tokens. Everything lives in memory.
+**[ope-license-server](./ope-license-server/)**: One readable file, `app.js`, which implements:
+- dynamic client registration, and the publisher's own site as a confidential client (the Web profile);
+- Authorization Code with PKCE, for exactly one resource;
+- DPoP-bound ES256 tokens, with pairwise subject identifiers;
+- refresh rotation, where a replayed refresh token revokes the grant;
+- RFC 7009 revocation, and RFC 7662 introspection that a publisher can use only for its own tokens.
 
-**[ope-reader](./ope-reader/)**: `ope-client.js` is the whole protocol in about 200 lines of fetch and WebCrypto, with no dependencies. The CLI and the browser app both use it. The browser app keeps its DPoP private key inside WebCrypto, where it can't be exported.
+It is also an atproto space's managing app (see [AT Protocol](#at-protocol)). State is kept in memory locally, in a Durable Object on Cloudflare, and in Netlify Blobs on Netlify.
 
-**[eleventy-plugin-ope](./eleventy-plugin-ope/)**: Everything a publisher needs, in four steps: install, describe your Offers, add the plugin, add a three-line Netlify Function (or one line of Express). At build time it writes the RFC 9728 metadata, the feed's `_ope` blocks, and the routing. It moves full posts out of the published site. At request time it runs the spec §11.2 checks.
+**[ope-reader](./ope-reader/)**: `ope-client.js` is the whole protocol in about 200 lines of fetch and WebCrypto, with no dependencies. The CLI and the browser app both use it. The browser app is a two-pane reader with an "Under the hood" panel that logs each protocol step. It keeps its DPoP private key inside WebCrypto, where it can't be exported. The blog serves it at `/reader/`.
+
+**[eleventy-plugin-ope](./eleventy-plugin-ope/)**: Everything a publisher needs, in four steps: install, describe your Offers, add the plugin, and add a server entry point (a Cloudflare Worker, a Netlify Function, or one line of Express). At build time it writes the RFC 9728 metadata, the feed's `_ope` blocks, and the routing, and it moves full posts out of the published site. At request time it runs the spec §11.2 checks, and the Web profile's sign-in routes (`/_ope/unlock`, `/_ope/callback`, `/_ope/leave`).
+
+**[atproto-example](./atproto-example/)**: A page explaining how a publisher on the AT Protocol can keep subscriber-only posts in an atproto space, with the License Server deciding who reads them. It includes a live address builder. The blog serves it at `/atproto/`.
 
 ## Tests
 
 ```bash
-cd ope-blog && npm test             # the publisher's checks, against a fake License Server (26 tests)
-cd ope-license-server && npm test   # end to end: real publisher, License Server, and client (20 tests)
+cd ope-blog && npm test                       # the publisher's checks, against a fake License Server (26 tests)
+cd ope-license-server && npm test             # unit tests (47), then end to end with a real publisher,
+                                              #   License Server, and client (26), locally and on the Netlify shim
+cd ope-license-server && npm run test:cloudflare   # the end-to-end suite in Cloudflare's local runtime
+cd ope-license-server && npm run test:spaces       # OPE and atproto spaces on Bluesky's spaces-alpha PDS (11)
 ```
+
+The end-to-end suite covers the Web profile too: unlocking on the blog, skipping consent for a returning subscriber, and refusing a revoked cookie. `test:spaces` installs about 460 MB of Bluesky's alpha packages into `ope-license-server/integration/`. Its account-linking tests use Playwright when it's installed and are skipped otherwise.
 
 ## Spec coverage
 
@@ -97,8 +114,10 @@ cd ope-license-server && npm test   # end to end: real publisher, License Server
 | §12 | Refresh rotation and replay detection, revocation, introspection with `permitted` and `revocation_reason` | License Server, ope-blog |
 | §17 | Entitlement records; cancelling revokes outstanding tokens | License Server |
 | Feeds profile | `_ope` blocks in JSON Feed, channel and item Offers | plugin, ope-blog |
+| Web profile | Sign-in from the publisher's server as a confidential client, an `HttpOnly` access cookie, the header-then-cookie check order | plugin, License Server, ope-blog |
+| Profile E (notes) | The License Server as an atproto space's managing app, and account linking with atproto OAuth (prototype; atproto spaces are alpha) | License Server |
 
-Not in this demo yet: `limit` Entitlements end to end (the publisher counts them, but the License Server only sells `access`), group Entitlements, bundles, agents, real payment, and persistent storage. A production-grade License Server is tracked in [open-portable-entitlement#11](https://github.com/shellen/open-portable-entitlement/issues/11).
+Not in this demo yet: `limit` Entitlements end to end (the publisher counts them, but the License Server only sells `access`), group Entitlements, bundles, agents, real accounts (sign-in takes any name), and real payment. A production-grade License Server is tracked in [open-portable-entitlement#11](https://github.com/shellen/open-portable-entitlement/issues/11).
 
 ## Put it online: one command
 
@@ -133,16 +152,22 @@ Both the publisher and the License Server run on Cloudflare Workers (`wrangler.j
 atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the launch within weeks, and breaking changes still land.
 
 **What works**
-- The License Server is a managing app: it has a `did:web` identity, and answers `checkUserAccess` (the published alpha) and `checkAccess` (the later code), each in its own shape.
-- It checks that each request is signed by the space's owner (atproto service auth), reading the owner's key from `plc.directory` or a `did:web` document, in current or older key formats.
-- Tested against **Bluesky's own spaces-alpha PDS**, run locally (`npm run test:spaces` in `ope-license-server`). The PDS asks the License Server, and issues a space credential only while the reader's subscription is active. It refuses an unsubscribed reader, a cancelled subscription, and an unlinked account.
+- **Linking an account by signing in.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the account's DID, and nothing else. It first checks that the server vouching for the account is the one the account's own PDS names.
+- **The managing app.** The License Server has a `did:web` identity, and answers the access check under both names the alpha has used: `checkUserAccess` (published) and `checkAccess` (Bluesky's newer code), each in its own shape. It checks that each request is signed by the space's owner (atproto service auth), reading the owner's key from `plc.directory` or a `did:web` document.
+- **The whole path, tested against Bluesky's own spaces-alpha PDS** run locally (`npm run test:spaces` in `ope-license-server`):
+  1. A subscriber links their account through the PDS's real sign-in page.
+  2. The publisher writes posts into a space naming the License Server as its managing app.
+  3. The PDS asks the License Server before issuing a space credential.
+  4. An app reads the posts with that credential.
+
+  Unsubscribed, cancelled, and unlinked readers are refused.
 - It runs on Cloudflare Workers, alongside the rest of the License Server.
 
 **What doesn't yet**
 - **No hosted space.** It hasn't run against a space on a hosted PDS: the alpha server is invite-only.
-- **Account linking is a stub.** A subscriber types an atproto handle on the License Server's account page, and the link isn't verified. A real version would have them sign in with that account (atproto OAuth).
-- **No reading posts yet.** The tests stop at the License Server's decision and the credential it unlocks. They don't have an app read the space's posts with that credential.
+- **No spaces in the reader app.** The test plays the atproto app; the demo's reader app doesn't open spaces.
 - **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set.
+- **Cancellation waits for credentials to expire.** Only the publisher's PDS can revoke a space credential early. When a subscription ends, the License Server refuses new credentials at once, and one already issued lasts until it expires (10 minutes by default).
 - **The API may change.** Method names and shapes are still moving in the alpha.
 
 ## Spec
