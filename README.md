@@ -24,14 +24,16 @@ atproto-example/       OPE and atproto spaces: how a publisher on atproto could 
 
 ## Quick start
 
+You need Node.js 20 or later.
+
 ```bash
 ./run-demo.sh
 ```
 
 | Service | URL | What it is |
 |---|---|---|
-| Reader UI | http://localhost:3000 | A browser app that reads a gated post one protocol step at a time |
-| Publisher | http://localhost:8080 | The blog. Gated posts show a preview until an app presents a valid token |
+| Reader UI | http://localhost:3000 | The reader app: subscribe once, unlock posts, and watch each protocol step |
+| Publisher | http://localhost:8080 | The blog. Gated posts show a preview until you subscribe on the blog, or an app presents a valid token |
 | License Server | http://localhost:4000 | Sign-in, consent, a pretend checkout, and your account page at `/account` |
 
 Or run the CLI reader in a second terminal:
@@ -42,7 +44,9 @@ node reader.js --auto alice          # fills in the demo forms for "alice"
 node reader.js                       # opens the sign-in page in your browser instead
 ```
 
-`run-demo.sh` creates a fresh introspection credential each run and gives it to the publisher and the License Server. That's how a revoked token stops working at the publisher right away.
+`run-demo.sh` creates a fresh shared secret each run and gives it to the publisher and the License Server. The publisher uses it for two things. It checks tokens at the License Server's `/introspect`, which is how a revoked token stops working right away. And it signs readers in on the blog itself (the Web profile).
+
+State lives in memory locally, so restarting `run-demo.sh` starts over: no accounts, no subscriptions, and a new signing key.
 
 ## How it fits together
 
@@ -66,6 +70,14 @@ node reader.js                       # opens the sign-in page in your browser in
 ```
 
 The steps match [Appendix B](https://feedspec.org/ope/spec/0.2/#appendix-b-implementer-guide-informative) of the spec.
+
+On the blog itself (the Web profile), the publisher's server takes the app's place:
+1. "Subscribe and read here" goes to `/_ope/unlock`, which sends the browser to the License Server's `/authorize`.
+2. The License Server redirects back to `/_ope/callback`.
+3. There the blog exchanges the code, authenticating with its client secret.
+4. The blog keeps the token in an `HttpOnly` cookie and serves the full post.
+
+A subscriber returning to sign in again skips the consent screen.
 
 ## The parts
 
@@ -98,7 +110,7 @@ cd ope-license-server && npm run test:cloudflare   # the end-to-end suite in Clo
 cd ope-license-server && npm run test:spaces       # OPE and atproto spaces on Bluesky's spaces-alpha PDS (11)
 ```
 
-The end-to-end suite covers the Web profile too: unlocking on the blog, skipping consent for a returning subscriber, and refusing a revoked cookie. `test:spaces` installs about 460 MB of Bluesky's alpha packages into `ope-license-server/integration/`. Its account-linking tests use Playwright when it's installed and are skipped otherwise.
+The end-to-end suite covers the Web profile too: unlocking on the blog, skipping consent for a returning subscriber, refusing a tampered sign-in, and locking posts again once the subscription is cancelled. `test:spaces` installs about 460 MB of Bluesky's alpha packages into `ope-license-server/integration/`. Its account-linking tests use Playwright when it's installed and are skipped otherwise.
 
 ## Spec coverage
 
@@ -109,7 +121,7 @@ The end-to-end suite covers the Web profile too: unlocking on the blog, skipping
 | §7 | RFC 9728 resource metadata (per scope and per URL), RFC 8414 with `protected_resources` | plugin, License Server |
 | §8 | Dynamic registration, Auth Code + PKCE, one `resource`, consent, `iss` in the response | License Server, reader |
 | §9 | `license+jwt` ES256 tokens, DPoP binding (`cnf.jkt`), the `License` scheme for unbound tokens | License Server, ope-blog |
-| §10 | Entitlement claims: `access`, item and collection coverage, rentals | License Server, ope-blog |
+| §10 | Entitlement claims: `access`, item and collection coverage, rentals (supported, though the demo sells none) | License Server, ope-blog |
 | §11 | The six Resource Server checks, `402`/`401`/`403` with `ope_scope` challenges | ope-blog |
 | §12 | Refresh rotation and replay detection, revocation, introspection with `permitted` and `revocation_reason` | License Server, ope-blog |
 | §17 | Entitlement records; cancelling revokes outstanding tokens | License Server |
@@ -135,7 +147,22 @@ Publisher:       https://ope-demo.<your-subdomain>.workers.dev
 License Server:  https://ope-license-server.<your-subdomain>.workers.dev
 ```
 
-Run it again any time to redeploy. The License Server keeps its accounts, subscriptions, and signing key in a Durable Object, so they survive redeploys. Workers deployed by the script aren't connected to GitHub; to redeploy on every push instead, connect each Worker to the repo in the Cloudflare dashboard (Worker → Settings → Build, with path `/ope-license-server` or `/ope-blog`).
+Run it again any time to redeploy. The License Server keeps its accounts, subscriptions, and signing key in a Durable Object (the SQLite kind, which the free plan includes), so they survive redeploys. Set `OPE_LS_NAME` and `OPE_BLOG_NAME` to deploy under other Worker names, or `CLOUDFLARE_API_TOKEN` to skip the browser sign-in.
+
+### Redeploying on every push
+
+Workers deployed by the script aren't connected to GitHub. To redeploy on every push, as the hosted demo does, connect each Worker to the repo in the Cloudflare dashboard: Worker → Settings → Build, with path `/ope-license-server` or `/ope-blog`. The Worker names must match the `name` in each `wrangler.jsonc`. Set these in the dashboard:
+
+| Worker | Setting | Kind | Value |
+|---|---|---|---|
+| `ope-license-server` | `OPE_PROTECTED_RESOURCES` | Variable | The blog's scope, for example `https://ope-demo.<subdomain>.workers.dev/posts/` |
+| `ope-license-server` | `OPE_RS_CLIENT_SECRET` | Secret | A long random string, shared with the blog |
+| `ope-license-server` | `OPE_SITE_NAME` | Variable, optional | The blog's name, shown when readers sign in from the blog |
+| `ope-license-server` | `OPE_MANAGED_SPACES` | Variable, optional | atproto spaces to manage (see [AT Protocol](#at-protocol)) |
+| `ope-demo` | `OPE_SITE_URL`, `OPE_LICENSE_SERVER` | Build variables | The blog's address and the License Server's address |
+| `ope-demo` | `OPE_RS_CLIENT_SECRET` | Secret | The same secret as the License Server's. Without it, apps still work, but readers can't subscribe on the blog itself, and revocation waits for tokens to expire |
+
+The blog's build bakes its address and the License Server's address into the published metadata, so those two are build variables, not runtime ones. Secrets survive every deploy. The License Server's config also sets `keep_vars`, so a deploy from Git keeps its dashboard variables. The blog's Worker has no runtime variables to keep.
 
 ### Adding OPE to your own site
 
@@ -143,7 +170,7 @@ You don't run a License Server; someone else does, the way a payment provider do
 
 ## Hosting
 
-Both the publisher and the License Server run on Cloudflare Workers (`wrangler.jsonc` in each folder) and on Netlify (`netlify.toml`). The hosted demo uses Cloudflare. On Cloudflare the License Server keeps its state and its signing key in a Durable Object, so its only settings are the publisher's scope and the shared introspection secret. The two Workers call each other over public HTTP, which on a shared `workers.dev` subdomain needs the `global_fetch_strictly_public` compatibility flag; both configs set it.
+Both the publisher and the License Server run on Cloudflare Workers (`wrangler.jsonc` in each folder) and on Netlify (`netlify.toml`). The hosted demo uses Cloudflare. On Cloudflare the License Server keeps its state and its signing key in a Durable Object, so its only required settings are the publisher's scope and the shared secret. The [License Server](./ope-license-server/) and [blog](./ope-blog/) READMEs list every setting, including Netlify's. The two Workers call each other over public HTTP, which on a shared `workers.dev` subdomain needs the `global_fetch_strictly_public` compatibility flag; both configs set it.
 
 ## AT Protocol
 
@@ -152,7 +179,7 @@ Both the publisher and the License Server run on Cloudflare Workers (`wrangler.j
 atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the launch within weeks, and breaking changes still land.
 
 **What works**
-- **Linking an account by signing in.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the account's DID, and nothing else. It first checks that the server vouching for the account is the one the account's own PDS names.
+- **Linking an account by signing in, live.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the account's DID and nothing else. It first checks that the server vouching for the account is the one the account's own PDS names. This works on the live demo with a real Bluesky account: on November 12, 2026, a bsky.social account was linked there. That account is hosted on one of Bluesky's PDSes, which names bsky.social as its authorization server. Try it at `/account` on the [live License Server](https://ope-license-server.jason-e0e.workers.dev/account).
 - **The managing app.** The License Server has a `did:web` identity, and answers the access check under both names the alpha has used: `checkUserAccess` (published) and `checkAccess` (Bluesky's newer code), each in its own shape. It checks that each request is signed by the space's owner (atproto service auth), reading the owner's key from `plc.directory` or a `did:web` document.
 - **The whole path, tested against Bluesky's own spaces-alpha PDS** run locally (`npm run test:spaces` in `ope-license-server`):
   1. A subscriber links their account through the PDS's real sign-in page.
@@ -166,7 +193,8 @@ atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the lau
 **What doesn't yet**
 - **No hosted space.** It hasn't run against a space on a hosted PDS: the alpha server is invite-only.
 - **No spaces in the reader app.** The test plays the atproto app; the demo's reader app doesn't open spaces.
-- **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set.
+- **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set. A linked account has no visible effect until then.
+- **Linking in local runs is untested against Bluesky.** Locally, the License Server uses atproto's loopback client (`http://localhost`), which the test exercises against the alpha PDS, but not against bsky.social.
 - **Cancellation waits for credentials to expire.** Only the publisher's PDS can revoke a space credential early. When a subscription ends, the License Server refuses new credentials at once, and one already issued lasts until it expires (10 minutes by default).
 - **The API may change.** Method names and shapes are still moving in the alpha.
 

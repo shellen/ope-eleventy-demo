@@ -72,6 +72,7 @@ A prototype of the spec's future ATProto profile (Profile E notes), built agains
   - **Deployed:** the client ID is `<issuer>/oauth/atproto-client-metadata.json`.
   - **Local runs:** it uses atproto's loopback client, with the callback on `127.0.0.1`.
   - **Handles:** resolved through DNS (over HTTPS, so it works on Workers), then `/.well-known/atproto-did`.
+  - **Live:** a real bsky.social account has been linked on the hosted demo (November 12, 2026).
 
 Tested two ways:
 

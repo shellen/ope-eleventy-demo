@@ -116,7 +116,7 @@
       <h3>Working now</h3>
       <ul>
         <li><b>The whole path, tested against Bluesky's own spaces-alpha PDS</b> run locally: the subscriber signs in on the PDS's own page to link their account, the publisher writes posts into the space, the PDS asks the License Server, and an app reads the posts with the credential it gets. Unsubscribed, cancelled, and unlinked readers are refused.</li>
-        <li><b>Account linking by signing in</b> (atproto OAuth, identity only). The License Server checks that the server vouching for the account is the one its own PDS names.</li>
+        <li><b>Account linking by signing in</b> (atproto OAuth, identity only). The License Server checks that the server vouching for the account is the one its own PDS names. Works on the live demo with a real Bluesky account.</li>
         <li>The License Server's managing-app endpoint, which checks that each request is signed by the space's owner, and its <code>did:web</code> identity.</li>
         <li>Answers from the same subscriptions the blog and the reader app use.</li>
         <li>Runs on Cloudflare Workers with the rest of the License Server.</li>

@@ -23,7 +23,7 @@ The License Server side is a working prototype: `ope-license-server/atproto.js` 
 atproto spaces are in alpha (proposal 0016, alpha since August 20, 2026), with breaking changes still landing.
 
 **Works:**
-- **Account linking by signing in.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the DID, after checking that the server vouching for it is the one the DID's own PDS names, and throws the tokens away.
+- **Account linking by signing in.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the DID, after checking that the server vouching for it is the one the DID's own PDS names, and throws the tokens away. It works on the live demo with a real Bluesky account (first linked November 12, 2026).
 - **The managing app.** The License Server answers a space's access checks, with signatures checked against the space owner's DID key. It answers both `checkUserAccess` (the published alpha) and `checkAccess` (Bluesky's newer code).
 - **The whole path, tested against Bluesky's own spaces-alpha PDS** run locally (`npm run test:spaces` in `ope-license-server`):
   1. The subscriber links their account through the PDS's real sign-in page.
