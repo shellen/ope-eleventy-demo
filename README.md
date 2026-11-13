@@ -107,7 +107,7 @@ cd ope-blog && npm test                       # the publisher's checks, against 
 cd ope-license-server && npm test             # unit tests (47), then end to end with a real publisher,
                                               #   License Server, and client (26), locally and on the Netlify shim
 cd ope-license-server && npm run test:cloudflare   # the end-to-end suite in Cloudflare's local runtime
-cd ope-license-server && npm run test:spaces       # OPE and atproto spaces on Bluesky's spaces-alpha PDS (11)
+cd ope-license-server && npm run test:spaces       # OPE and atproto spaces on Bluesky's spaces-alpha PDS (19)
 ```
 
 The end-to-end suite covers the Web profile too: unlocking on the blog, skipping consent for a returning subscriber, refusing a tampered sign-in, and locking posts again once the subscription is cancelled. `test:spaces` installs about 460 MB of Bluesky's alpha packages into `ope-license-server/integration/`. Its account-linking tests use Playwright when it's installed and are skipped otherwise.
@@ -187,13 +187,20 @@ atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the lau
   3. The PDS asks the License Server before issuing a space credential.
   4. An app reads the posts with that credential.
 
-  Unsubscribed, cancelled, and unlinked readers are refused. The test runs against the alpha published November 12, 2026.
+  Unsubscribed, cancelled, and unlinked readers are refused. The tests run against the alpha published November 12, 2026.
+- **A multi-user app that checks each user** ([`atproto-example/space-app.mjs`](./atproto-example/space-app.mjs), tested in `ope-license-server/integration/space-app.test.js`). Under the proposal, a space credential admits an *app*, not each reader. So the app syncs the space once, using one subscriber's session, and then checks each of its users separately. It shows a user the posts only while it holds a License Token for that user covering the space's Asset, and refreshes the token to re-check. Against the alpha PDS, with the real License Server:
+  - a subscriber sees the posts;
+  - another user of the same app, with no subscription, doesn't, though the app holds the posts;
+  - a user who subscribes from the app sees them without ever linking an atproto account;
+  - when a subscriber cancels, their view locks at the next check, and the app can no longer sync with their session.
+
+  The app needs no dependencies: fetch and WebCrypto, including the RFC 9421 request signatures, which Bluesky's PDS accepts.
 - It runs on Cloudflare Workers, alongside the rest of the License Server.
 
 **What doesn't yet**
 - **No hosted space.** It hasn't run against a space on a hosted PDS: the alpha server is invite-only.
-- **No spaces in the reader app.** The test plays the atproto app; the demo's reader app doesn't open spaces.
-- **Per-user checks inside apps.** A space credential lets an *app* sync the space; it doesn't say which of the app's users may see it. Under the proposal, an app serving many users decides that itself. For a paid space, OPE gives it a way: check each user's entitlement, for example with an OPE License Token for the space's Asset. Nothing in the demo does that yet.
+- **No spaces in the reader app.** The multi-user app is a library driven by the test, not something you can open; the demo's reader app doesn't open spaces.
+- **Which Asset a space stands for is configuration.** The License Server and the app are each told which OPE Asset a space corresponds to. Nothing published in the space says so yet (an open question in the spec's Profile E notes).
 - **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set. A linked account has no visible effect until then.
 - **Linking in local runs is untested against Bluesky.** Locally, the License Server uses atproto's loopback client (`http://localhost`), which the test exercises against the alpha PDS, but not against bsky.social.
 - **Cancellation waits for credentials to expire.** Only the publisher's PDS can revoke a space credential early. When a subscription ends, the License Server refuses new credentials at once, and one already issued lasts until it expires (10 minutes by default).

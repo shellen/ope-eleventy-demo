@@ -84,6 +84,8 @@ Tested two ways:
   4. An app reads the posts with that credential, signing each request with its key (RFC 9421). A request signed with another key is refused.
   5. After a cancellation, no new credential is issued. A credential already issued keeps working until it expires (10 minutes): only the space's authority can revoke one early.
 
+  It also runs a multi-user app (`integration/space-app.test.js`, using `../atproto-example/space-app.mjs`). The app syncs the space once with one subscriber's session, then shows the posts only to users it holds a License Token for. A user without a subscription stays locked out, a user who subscribes from the app needs no linked atproto account, and a cancellation locks that user at the next token refresh.
+
   Playwright is found from `integration/` or `NODE_PATH`; without it, the linking tests are skipped. It lives in `integration/`, with its own dependencies (about 460 MB), so the normal install and Cloudflare builds don't carry them. Its `package.json` pins every `@atproto` package to one alpha snapshot (currently November 12, 2026). The snapshot's version ranges also match broken placeholder releases (`@atproto/lex@0.0.0`, and `0.0.0-stage` builds of `lex-rpc` and `oauth-resolver`) that npm would otherwise install.
 
 The alpha has shipped two versions of this call, and the server answers both:
