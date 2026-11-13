@@ -8,7 +8,7 @@
 import { verifySignature, formatDidKey, multibaseToBytes, parseMultikey, P256_JWT_ALG, SECP256K1_JWT_ALG } from "@atproto/crypto";
 
 export const CHECK_ACCESS = "com.atproto.managedspace.checkAccess";
-// The proposal text calls it checkUserAccess; answer both while the alpha settles.
+// The November 5 alpha called it checkUserAccess; answer both while the alpha settles.
 export const CHECK_USER_ACCESS = "com.atproto.managedspace.checkUserAccess";
 export const SERVICE_ID = "ope_space_manager";
 
@@ -113,8 +113,8 @@ export function createSpaceManager({ issuer, spaces, entitled, resolveKey }) {
   }
 
   // Express handler for both method names. The alpha has shipped two shapes:
-  //   checkUserAccess (published alpha):  ?space&user&access=read|write → { authorized }
-  //   checkAccess (Bluesky's integration branch since November 2026):
+  //   checkUserAccess (alpha of Nov 5):    ?space&user&access=read|write → { authorized }
+  //   checkAccess (alpha of Nov 12, and the proposal):
   //                                       ?space[&repo][&clientId]      → { read, write }
   // repo is absent for an anonymous read, clientId for writes.
   async function checkAccess(req, res) {

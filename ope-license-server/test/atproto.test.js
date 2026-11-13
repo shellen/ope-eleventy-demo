@@ -83,7 +83,7 @@ describe("ATProto profile prototype: License Server as a space's managing app", 
     assert.deepEqual((await ask({ space: other })).body, { read: false, write: false });
   });
 
-  it("answers the published alpha's checkUserAccess, one access level at a time", async () => {
+  it("answers the November 5 alpha's checkUserAccess, one access level at a time", async () => {
     seed();
     const read = await ask({ lxm: "com.atproto.managedspace.checkUserAccess", param: "user" });
     assert.deepEqual(read.body, { authorized: true });

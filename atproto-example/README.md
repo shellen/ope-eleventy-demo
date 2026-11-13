@@ -23,8 +23,8 @@ The License Server side is a working prototype: `ope-license-server/atproto.js` 
 atproto spaces are in alpha (proposal 0016, alpha since August 20, 2026), with breaking changes still landing.
 
 **Works:**
-- **Account linking by signing in.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the DID, after checking that the server vouching for it is the one the DID's own PDS names, and throws the tokens away.
-- **The managing app.** The License Server answers a space's access checks, with signatures checked against the space owner's DID key. It answers both `checkUserAccess` (the published alpha) and `checkAccess` (Bluesky's newer code).
+- **Account linking by signing in.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the DID, after checking that the server vouching for it is the one the DID's own PDS names, and throws the tokens away. It works on the live demo with a real Bluesky account (first linked November 12, 2026).
+- **The managing app.** The License Server answers a space's access checks, with signatures checked against the space owner's DID key. It answers `checkAccess`, the proposal's name and the alpha's since November 12, and still answers `checkUserAccess`, the November 5 alpha's name.
 - **The whole path, tested against Bluesky's own spaces-alpha PDS** run locally (`npm run test:spaces` in `ope-license-server`):
   1. The subscriber links their account through the PDS's real sign-in page.
   2. The publisher creates the space and writes posts into it.
@@ -37,6 +37,7 @@ atproto spaces are in alpha (proposal 0016, alpha since August 20, 2026), with b
 - **A hosted space.** The alpha server is invite-only.
 - **Live access.** The live License Server manages no space until `OPE_MANAGED_SPACES` is set.
 - **A reader app for spaces.** The test plays the app.
+- **Per-user checks inside apps.** A space credential lets an *app* sync the space; it doesn't say which of the app's users may see it. Under the proposal, an app serving many users decides that itself. For a paid space, OPE gives it a way: check each user's entitlement, for example with an OPE License Token for the space's Asset.
 - **Early cancellation.** Only the space's authority (the publisher's PDS) can revoke a credential before it expires. So a cancellation stops new credentials at once, and a credential already issued lasts its lifetime: 10 minutes by default.
 - **A stable API.**
 
@@ -51,10 +52,11 @@ const { token } = await xrpc(readerPds, "com.atproto.space.getDelegationToken", 
 // 2. A space credential from the space's host, bound to a key the app holds.
 //    The host asks the License Server first.
 const key = await P256Keypair.create();
-const { credential } = await xrpc(spaceHost, "com.atproto.space.getSpaceCredential",
-  { space, credentialKid: key.did(), delegationToken: token });
+const { credential } = await xrpc(spaceHost, "com.atproto.space.authorizeSpaceSync",
+  { space, credentialKey: key.did(), delegationToken: token });
 // 3. Read, signing each request with that key.
-const headers = await createSpaceSigHeaders(key, {
+const { headers } = await createSpaceSigHeaders({
+  keypair: key,
   authorization: `Atproto-Space-Credential ${credential}`,
   audience: publisherDid,           // the repo being read
 });

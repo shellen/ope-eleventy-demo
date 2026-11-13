@@ -116,7 +116,7 @@
       <h3>Working now</h3>
       <ul>
         <li><b>The whole path, tested against Bluesky's own spaces-alpha PDS</b> run locally: the subscriber signs in on the PDS's own page to link their account, the publisher writes posts into the space, the PDS asks the License Server, and an app reads the posts with the credential it gets. Unsubscribed, cancelled, and unlinked readers are refused.</li>
-        <li><b>Account linking by signing in</b> (atproto OAuth, identity only). The License Server checks that the server vouching for the account is the one its own PDS names.</li>
+        <li><b>Account linking by signing in</b> (atproto OAuth, identity only). The License Server checks that the server vouching for the account is the one its own PDS names. Works on the live demo with a real Bluesky account.</li>
         <li>The License Server's managing-app endpoint, which checks that each request is signed by the space's owner, and its <code>did:web</code> identity.</li>
         <li>Answers from the same subscriptions the blog and the reader app use.</li>
         <li>Runs on Cloudflare Workers with the rest of the License Server.</li>
@@ -129,7 +129,8 @@
         <li><b>Live access.</b> The live License Server doesn't manage any space until it's configured with one, and there's no hosted space to configure yet.</li>
         <li><b>A reader app for spaces.</b> The test plays the app. The demo's reader app doesn't open atproto spaces.</li>
         <li><b>Early cancellation.</b> Only the publisher's server can cancel a credential before it expires; the License Server can't ask it to yet.</li>
-        <li><b>A stable API.</b> The published alpha calls it <code>checkUserAccess</code>; Bluesky's newer code calls it <code>checkAccess</code>, with a different answer. The License Server answers both.</li>
+        <li><b>Per-user checks inside apps.</b> A space credential lets an app sync the space, not decide which of its users see it. An app serving many users has to check each one's subscription itself. OPE gives it a way to, but nothing in the demo does it yet.</li>
+        <li><b>A stable API.</b> Names still change from week to week: on November 12 the call for a credential was renamed, and the access check settled on <code>checkAccess</code>. The License Server answers the old name too.</li>
       </ul>
     </div>
   </section>
