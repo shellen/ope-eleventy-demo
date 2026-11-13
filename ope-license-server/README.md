@@ -66,7 +66,7 @@ The publisher's site signs readers in from its own server, as a confidential cli
 A prototype of the spec's future ATProto profile (Profile E notes), built against the atproto spaces alpha (proposal 0016). A publisher with an atproto space under the `managedspace` policy can set the space's `managingApp` to this License Server. The space host then asks the License Server, for each reader, whether they may read. The answer comes from the reader's OPE subscription.
 
 - **Identity:** the server publishes a `did:web` document at `/.well-known/did.json`. Its managing-app reference is `did:web:<host>#ope_space_manager`.
-- **Endpoint:** `GET /xrpc/com.atproto.managedspace.checkAccess?space=<space-ref>&repo=<reader DID>`. It requires atproto service auth from the space's authority: a JWT signed with the authority DID's key, addressed to this server and to this method. It returns `{ "read": <active subscription covering the space>, "write": false }`. A request with no `repo` (an anonymous read) gets `false` for both. The published alpha's name for it, `checkUserAccess`, is answered too.
+- **Endpoint:** `GET /xrpc/com.atproto.managedspace.checkAccess?space=<space-ref>&repo=<reader DID>`. It requires atproto service auth from the space's authority: a JWT signed with the authority DID's key, addressed to this server and to this method. It returns `{ "read": <active subscription covering the space>, "write": false }`. A request with no `repo` (an anonymous read) gets `false` for both. The November 5 alpha's name for it, `checkUserAccess`, is answered too.
 - **Configuration:** `OPE_MANAGED_SPACES`, a JSON list of `{ "space": "at://<publisher DID>/space/<type>/<skey>", "resource": "<OPE resource>" }`. Off when unset.
 - **Account linking** (`atproto-oauth.js`): on `/account`, a subscriber signs in with their atproto account. The License Server is an atproto OAuth client asking for scope `atproto`, which is identity only. It resolves the handle to a DID and a PDS, and finds the PDS's authorization server. It then sends a pushed authorization request with PKCE and a DPoP proof, and exchanges the code. It keeps the token response's `sub` (the DID) and throws the tokens away. The check that matters most: the authorization server that signed the account in must be the one the DID's own PDS names.
   - **Deployed:** the client ID is `<issuer>/oauth/atproto-client-metadata.json`.
@@ -80,15 +80,15 @@ Tested two ways:
 - **`npm run test:spaces`** runs the License Server against **Bluesky's own spaces-alpha PDS**, in-process, using `@atproto/dev-env`. The whole path, unmocked:
   1. The subscriber links their account through the PDS's real sign-in and consent pages, driven by Playwright. A denied consent links nothing.
   2. The publisher creates a managed space naming this server, and writes posts into it.
-  3. The PDS resolves our `did:web` and calls `checkUserAccess` with the publisher's service auth. It issues a space credential only while the reader's subscription is active.
+  3. When an app calls `authorizeSpaceSync`, the PDS resolves our `did:web` and calls `checkAccess` with the publisher's service auth. It issues a space credential only while the reader's subscription is active.
   4. An app reads the posts with that credential, signing each request with its key (RFC 9421). A request signed with another key is refused.
   5. After a cancellation, no new credential is issued. A credential already issued keeps working until it expires (10 minutes): only the space's authority can revoke one early.
 
-  Playwright is found from `integration/` or `NODE_PATH`; without it, the linking tests are skipped. It lives in `integration/`, with its own dependencies (about 460 MB), so the normal install and Cloudflare builds don't carry them. Its `package.json` pins every `@atproto` package to the alpha snapshot, because the snapshot's version ranges also match a broken `@atproto/lex@0.0.0` placeholder.
+  Playwright is found from `integration/` or `NODE_PATH`; without it, the linking tests are skipped. It lives in `integration/`, with its own dependencies (about 460 MB), so the normal install and Cloudflare builds don't carry them. Its `package.json` pins every `@atproto` package to one alpha snapshot (currently November 12, 2026). The snapshot's version ranges also match broken placeholder releases (`@atproto/lex@0.0.0`, and `0.0.0-stage` builds of `lex-rpc` and `oauth-resolver`) that npm would otherwise install.
 
 The alpha has shipped two versions of this call, and the server answers both:
 
-| | Published alpha (Nov 5) | Bluesky's integration branch (Nov 11) |
+| | Alpha of November 5 | Alpha of November 12, and the proposal |
 |---|---|---|
 | Method | `checkUserAccess` | `checkAccess` |
 | Parameters | `space`, `user`, `access` (read or write), `clientId` | `space`, `repo` (absent for an anonymous read), `clientId` (absent for writes) |

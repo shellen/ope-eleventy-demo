@@ -7,7 +7,7 @@
 //   2. A publisher creates a space under the `managedspace` policy, naming this License
 //      Server as its managing app, and writes posts into it.
 //   3. An app asks the PDS for a space credential for the subscriber. The PDS resolves
-//      our did:web document and calls our checkUserAccess with service auth signed by
+//      our did:web document and calls our checkAccess with service auth signed by
 //      the publisher's key. We answer from the subscriber's OPE subscription.
 //   4. The app reads the space's posts with that credential, signing each request
 //      with the key the credential is bound to (RFC 9421).
@@ -50,7 +50,7 @@ async function requestCredential(actor) {
   const delegation = await xrpc("com.atproto.space.getDelegationToken", { token: actor.accessJwt, params: { space } });
   assert.equal(delegation.status, 200, "the reader's PDS issues a delegation token");
   const key = await P256Keypair.create();
-  const res = await xrpc("com.atproto.space.getSpaceCredential", { body: { space, credentialKid: key.did(), delegationToken: delegation.token } });
+  const res = await xrpc("com.atproto.space.authorizeSpaceSync", { body: { space, credentialKey: key.did(), delegationToken: delegation.token } });
   return { ...res, key };
 }
 
@@ -58,7 +58,7 @@ async function requestCredential(actor) {
 // Message Signature over it and the audience (the repo being read), made with the
 // key the credential is bound to.
 async function readPosts({ credential, key }) {
-  const headers = await createSpaceSigHeaders(key, { authorization: `Atproto-Space-Credential ${credential}`, audience: publisher.did });
+  const { headers } = await createSpaceSigHeaders({ keypair: key, authorization: `Atproto-Space-Credential ${credential}`, audience: publisher.did });
   return xrpc("com.atproto.space.listRecords", { params: { space, repo: publisher.did, collection: POSTS }, headers });
 }
 
@@ -152,7 +152,7 @@ describe("A space on Bluesky's spaces-alpha PDS, managed by the License Server",
       body: { spaceType: SPACE_TYPE, skey: SKEY, policy: { $type: "com.atproto.managedspace.policy", managingApp: ls.spaceManager.managingApp } },
     });
     assert.equal(created.status, 200, JSON.stringify(created));
-    assert.equal(created.uri, space);
+    assert.equal(created.space, space);
   });
 
   it("lets the publisher write subscriber-only posts into the space", async () => {
@@ -171,7 +171,7 @@ describe("A space on Bluesky's spaces-alpha PDS, managed by the License Server",
     const cred = await requestCredential(ada);
     assert.equal(cred.status, 400);
     assert.equal(cred.error, "SpaceNotFound", "a refused reader can't even see the space");
-    assert.ok(lsCalls.some((u) => u.includes("com.atproto.managedspace.checkUserAccess")), "the PDS consulted the License Server");
+    assert.ok(lsCalls.some((u) => u.includes("com.atproto.managedspace.checkAccess")), "the PDS consulted the License Server");
   });
 
   it("issues a space credential to a subscribed reader with a linked account", async () => {

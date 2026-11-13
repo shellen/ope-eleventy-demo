@@ -180,19 +180,20 @@ atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the lau
 
 **What works**
 - **Linking an account by signing in, live.** On the License Server's account page, a subscriber signs in with their atproto account (atproto OAuth, scope `atproto`: identity only). The License Server keeps the account's DID and nothing else. It first checks that the server vouching for the account is the one the account's own PDS names. This works on the live demo with a real Bluesky account: on November 12, 2026, a bsky.social account was linked there. That account is hosted on one of Bluesky's PDSes, which names bsky.social as its authorization server. Try it at `/account` on the [live License Server](https://ope-license-server.jason-e0e.workers.dev/account).
-- **The managing app.** The License Server has a `did:web` identity, and answers the access check under both names the alpha has used: `checkUserAccess` (published) and `checkAccess` (Bluesky's newer code), each in its own shape. It checks that each request is signed by the space's owner (atproto service auth), reading the owner's key from `plc.directory` or a `did:web` document.
+- **The managing app.** The License Server has a `did:web` identity, and answers the space host's `checkAccess` (the proposal's name, used by the alpha since November 12). It still answers `checkUserAccess`, the November 5 alpha's name, in that version's shape. It checks that each request is signed by the space's owner (atproto service auth), reading the owner's key from `plc.directory` or a `did:web` document.
 - **The whole path, tested against Bluesky's own spaces-alpha PDS** run locally (`npm run test:spaces` in `ope-license-server`):
   1. A subscriber links their account through the PDS's real sign-in page.
   2. The publisher writes posts into a space naming the License Server as its managing app.
   3. The PDS asks the License Server before issuing a space credential.
   4. An app reads the posts with that credential.
 
-  Unsubscribed, cancelled, and unlinked readers are refused.
+  Unsubscribed, cancelled, and unlinked readers are refused. The test runs against the alpha published November 12, 2026.
 - It runs on Cloudflare Workers, alongside the rest of the License Server.
 
 **What doesn't yet**
 - **No hosted space.** It hasn't run against a space on a hosted PDS: the alpha server is invite-only.
 - **No spaces in the reader app.** The test plays the atproto app; the demo's reader app doesn't open spaces.
+- **Per-user checks inside apps.** A space credential lets an *app* sync the space; it doesn't say which of the app's users may see it. Under the proposal, an app serving many users decides that itself. For a paid space, OPE gives it a way: check each user's entitlement, for example with an OPE License Token for the space's Asset. Nothing in the demo does that yet.
 - **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set. A linked account has no visible effect until then.
 - **Linking in local runs is untested against Bluesky.** Locally, the License Server uses atproto's loopback client (`http://localhost`), which the test exercises against the alpha PDS, but not against bsky.social.
 - **Cancellation waits for credentials to expire.** Only the publisher's PDS can revoke a space credential early. When a subscription ends, the License Server refuses new credentials at once, and one already issued lasts until it expires (10 minutes by default).
