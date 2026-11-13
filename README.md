@@ -2,7 +2,7 @@
 
 Running code for every role in [Open Portable Entitlement (OPE)](https://feedspec.org/ope/spec/0.2/): a publisher, a License Server, and two reader apps. Start them all with one command, then watch a subscription made in one place unlock a post on the blog itself and in any app.
 
-**See it live:** the [demo blog](https://ope-demo.jason-e0e.workers.dev), its [reader app](https://ope-demo.jason-e0e.workers.dev/reader/), and a [walkthrough with screenshots](https://feedspec.org/ope/demo/).
+**See it live:** the [demo blog](https://ope-demo.jason-e0e.workers.dev), its [reader app](https://ope-demo.jason-e0e.workers.dev/reader/), the [space app](https://ope-demo.jason-e0e.workers.dev/space-app/) (one app, several users, each checked separately), and a [walkthrough with screenshots](https://feedspec.org/ope/demo/).
 
 Aligned with **OPE spec v0.2** (proposed, open for comment). The v0.1 demo lives on the [`v0.1` branch](../../tree/v0.1).
 
@@ -98,14 +98,14 @@ It is also an atproto space's managing app (see [AT Protocol](#at-protocol)). St
 
 **[eleventy-plugin-ope](./eleventy-plugin-ope/)**: Everything a publisher needs, in four steps: install, describe your Offers, add the plugin, and add a server entry point (a Cloudflare Worker, a Netlify Function, or one line of Express). At build time it writes the RFC 9728 metadata, the feed's `_ope` blocks, and the routing, and it moves full posts out of the published site. At request time it runs the spec §11.2 checks, and the Web profile's sign-in routes (`/_ope/unlock`, `/_ope/callback`, `/_ope/leave`).
 
-**[atproto-example](./atproto-example/)**: A page explaining how a publisher on the AT Protocol can keep subscriber-only posts in an atproto space, with the License Server deciding who reads them. It includes a live address builder. The blog serves it at `/atproto/`.
+**[atproto-example](./atproto-example/)**: A page explaining how a publisher on the AT Protocol can keep subscriber-only posts in an atproto space, with the License Server deciding who reads them. It includes a live address builder. The blog serves it at `/atproto/`. Next to it, `space-app.mjs` and `space-app/` are a multi-user atproto app that checks each of its users with OPE; the blog serves the app at `/space-app/`.
 
 ## Tests
 
 ```bash
 cd ope-blog && npm test                       # the publisher's checks, against a fake License Server (26 tests)
-cd ope-license-server && npm test             # unit tests (47), then end to end with a real publisher,
-                                              #   License Server, and client (26), locally and on the Netlify shim
+cd ope-license-server && npm test             # unit tests (21) and the end-to-end suite with a real publisher,
+                                              #   License Server, and client (27), then that suite again on the Netlify shim
 cd ope-license-server && npm run test:cloudflare   # the end-to-end suite in Cloudflare's local runtime
 cd ope-license-server && npm run test:spaces       # OPE and atproto spaces on Bluesky's spaces-alpha PDS (19)
 ```
@@ -195,11 +195,17 @@ atproto spaces are in **alpha** (since August 20, 2026). Bluesky expects the lau
   - when a subscriber cancels, their view locks at the next check, and the app can no longer sync with their session.
 
   The app needs no dependencies: fetch and WebCrypto, including the RFC 9421 request signatures, which Bluesky's PDS accepts.
+- **The space app, open on the blog** at [`/space-app/`](https://ope-demo.jason-e0e.workers.dev/space-app/). It is one page playing the app's server and its users (Ada, Bobby, Carol, or any you add):
+  - connect each user's subscription at the License Server;
+  - sync once for one subscriber;
+  - switch users to see who the app shows the posts to.
+
+  On the hosted blog the space is a labeled stand-in: no atproto space can run there, so the app syncs the blog's subscriber-only posts with one subscriber's License Token. Each user's view is still checked with their own token. Locally, `npm run space-app` in `ope-license-server/integration` serves the same page against a real space on Bluesky's alpha PDS. There, syncing is refused until the chosen user subscribes, because the License Server, as managing app, says no.
 - It runs on Cloudflare Workers, alongside the rest of the License Server.
 
 **What doesn't yet**
 - **No hosted space.** It hasn't run against a space on a hosted PDS: the alpha server is invite-only.
-- **No spaces in the reader app.** The multi-user app is a library driven by the test, not something you can open; the demo's reader app doesn't open spaces.
+- **A real space on the hosted blog.** The live space app uses a stand-in, and the reader app doesn't open spaces.
 - **Which Asset a space stands for is configuration.** The License Server and the app are each told which OPE Asset a space corresponds to. Nothing published in the space says so yet (an open question in the spec's Profile E notes).
 - **Live access isn't configured.** The live License Server doesn't manage any space until `OPE_MANAGED_SPACES` is set. A linked account has no visible effect until then.
 - **Linking in local runs is untested against Bluesky.** Locally, the License Server uses atproto's loopback client (`http://localhost`), which the test exercises against the alpha PDS, but not against bsky.social.

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Space App</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,400;6..72,600&display=swap">
+<style>
+  /* A multi-user atproto app, both sides at once: on the left, the app's copy of the
+     space and its users; on the right, what the selected user sees. */
+  :root {
+    --bg: #ffffff; --sidebar: #f5f5f7; --raised: #ffffff; --fg: #1d1d1f; --muted: #6e6e73; --faint: #a1a1a6;
+    --line: #e5e5ea; --accent: #2563eb; --accent-fg: #ffffff; --accent-soft: #e8efff;
+    --open: #15803d; --open-soft: #e6f4ea; --locked: #8e8e93; --warn: #b45309; --warn-soft: #fff7e6; --bad: #c2410c;
+    --ui: "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    --read: "Newsreader", "Iowan Old Style", Georgia, serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161618; --sidebar: #1e1e21; --raised: #232326; --fg: #f5f5f7; --muted: #a1a1a6; --faint: #6e6e73;
+      --line: #2e2e32; --accent: #6b9bff; --accent-fg: #0b1020; --accent-soft: #1c2742; --open: #4ade80; --open-soft: #13281b;
+      --locked: #8e8e93; --warn: #fbbf24; --warn-soft: #2a2110; --bad: #fb923c; color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.5 var(--ui); -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+
+  .app { min-height: 100%; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
+  .side { background: var(--sidebar); border-right: 1px solid var(--line); padding: 22px 16px 28px; display: grid; gap: 22px; align-content: start; }
+  .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.05rem; padding: 0 4px; }
+  .brand-mark { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, #0ea5e9, #2563eb); color: #fff; display: grid; place-items: center; font-size: 0.8rem; }
+  .label { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); padding: 0 4px 8px; }
+  .card { background: var(--raised); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: grid; gap: 10px; font-size: 0.88rem; }
+  .card p { margin: 0; color: var(--muted); }
+  .card strong { color: var(--fg); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .stand-in { font-size: 0.78rem; background: var(--warn-soft); color: var(--warn); border-radius: 8px; padding: 8px 10px; }
+  select { border: 1px solid var(--line); background: var(--raised); border-radius: 8px; padding: 6px 8px; }
+  .btn { border: 1px solid var(--line); background: var(--raised); border-radius: 999px; padding: 6px 14px; font-size: 0.84rem; font-weight: 500; }
+  .btn:hover { border-color: var(--faint); }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .btn.danger { color: var(--bad); }
+  .btn:disabled { opacity: 0.55; cursor: progress; }
+
+  .users { display: grid; gap: 4px; }
+  .user { width: 100%; text-align: left; border: 0; background: transparent; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 9px 10px; border-radius: 10px; }
+  .user:hover { background: color-mix(in srgb, var(--fg) 5%, transparent); }
+  .user[aria-current="true"] { background: var(--accent); color: var(--accent-fg); }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; color: #fff; }
+  .user-name { font-weight: 600; font-size: 0.9rem; }
+  .user-state { font-size: 0.76rem; color: var(--muted); }
+  .user[aria-current="true"] .user-state { color: color-mix(in srgb, var(--accent-fg) 75%, transparent); }
+  .pill { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+  .pill.open { background: var(--open-soft); color: var(--open); }
+  .pill.locked { background: color-mix(in srgb, var(--locked) 16%, transparent); color: var(--muted); }
+  .user[aria-current="true"] .pill { background: color-mix(in srgb, var(--accent-fg) 22%, transparent); color: var(--accent-fg); }
+  .add { display: flex; gap: 6px; padding: 6px 4px 0; }
+  .add input { flex: 1; min-width: 0; border: 1px solid var(--line); background: var(--raised); border-radius: 8px; padding: 6px 10px; font-size: 0.86rem; }
+
+  .main { min-width: 0; display: grid; grid-template-rows: auto minmax(0, 1fr); }
+  .toolbar { display: flex; align-items: center; gap: 10px; padding: 12px 24px; border-bottom: 1px solid var(--line); min-height: 58px; flex-wrap: wrap; }
+  .toolbar h1 { font-size: 1rem; margin: 0; font-weight: 600; }
+  .toolbar .spacer { flex: 1; }
+  .content { max-width: 720px; width: 100%; margin: 0 auto; padding: 36px 28px 96px; display: grid; gap: 22px; align-content: start; }
+  .intro { color: var(--muted); font-size: 0.92rem; margin: 0; }
+  .locked-card { border: 1px solid var(--line); border-radius: 18px; padding: 26px; background: var(--raised); display: grid; gap: 14px; box-shadow: 0 1px 2px rgb(0 0 0 / 0.04), 0 12px 32px -12px rgb(0 0 0 / 0.12); }
+  .locked-card h2 { margin: 0; font-size: 1.2rem; letter-spacing: -0.01em; }
+  .locked-card p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .post { border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+  .post h2 { font-family: var(--read); font-weight: 600; font-size: 1.5rem; line-height: 1.2; margin: 0 0 10px; }
+  .post .body { font-family: var(--read); font-size: 1.1rem; line-height: 1.6; }
+  .post .body p { margin: 0 0 0.9em; }
+  .post .more { border: 0; background: none; color: var(--accent); padding: 0; font-weight: 500; }
+  .empty { color: var(--muted); font-size: 0.92rem; }
+  .log { font-size: 0.8rem; color: var(--muted); border-top: 1px solid var(--line); padding-top: 14px; display: grid; gap: 4px; }
+  .log b { color: var(--fg); font-weight: 600; }
+  .err { color: var(--bad); }
+
+  @media (max-width: 760px) {
+    .app { grid-template-columns: 1fr; }
+    .side { border-right: 0; border-bottom: 1px solid var(--line); }
+    .toolbar, .content { padding-left: 16px; padding-right: 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side" aria-label="The app">
+    <div class="brand"><span class="brand-mark">S</span> Space App</div>
+
+    <section>
+      <div class="label">The app's copy of the space</div>
+      <div class="card">
+        <p id="source-note"></p>
+        <div class="row">
+          <label for="sync-as" style="font-size:0.84rem;color:var(--muted)">Sync for</label>
+          <select id="sync-as"></select>
+          <button class="btn primary" id="sync">Sync</button>
+        </div>
+        <p id="sync-status">Nothing synced yet.</p>
+        <div class="stand-in" id="stand-in" hidden></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="label">The app's users</div>
+      <div class="users" id="users"></div>
+      <form class="add" id="add-user">
+        <input id="new-user" placeholder="Add a user" aria-label="New user's name" maxlength="24">
+        <button class="btn" type="submit">Add</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <p><strong>What this shows.</strong> In atproto spaces, a space credential admits an <em>app</em>, not each reader. The app syncs the space once, for everyone, then has to decide which of its users see it. Here it decides with OPE: a user sees the posts only while the app holds a License Token for <em>that</em> user.</p>
+      <p>This page plays the app's server and its users at once, so you can see both sides. <a href="../atproto/">How OPE and atproto spaces fit</a></p>
+    </section>
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <h1 id="viewing">Viewing as …</h1>
+      <span class="pill" id="viewing-pill"></span>
+      <span class="spacer"></span>
+      <button class="btn" id="connect">Connect subscription</button>
+      <button class="btn" id="recheck">Check again</button>
+      <button class="btn danger" id="disconnect">Disconnect</button>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+
+<script type="module">
+  import { createSpaceApp, atprotoSpaceSource, blogStandInSource } from "../atproto-example/space-app.mjs";
+
+  // Local runs of the atproto integration serve a config.json naming a real space; the
+  // hosted blog has none and uses the stand-in.
+  const config = await fetch("./config.json", { credentials: "omit" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+  const ORIGIN = location.origin;
+  const asset = config?.asset || `${ORIGIN}/posts/`;
+  const realSpace = config?.source?.type === "atproto";
+  const source = realSpace
+    ? atprotoSpaceSource(config.source)
+    : blogStandInSource({ feedUrl: `${ORIGIN}/feed.json` });
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+  const COLORS = ["#2563eb", "#7c3aed", "#db2777", "#ea580c", "#0d9488", "#4d7c0f"];
+  let names = config?.users || ["Ada", "Bobby", "Carol"];
+  const SHORT = { no_entitlement: "No subscription", access_denied: "Didn't subscribe", invalid_grant: "Subscription ended", "the sign-in window was closed": "Sign-in closed" };
+  let current = names[0];
+  const log = [];
+
+  // Sign-in happens in a popup at the License Server; its redirect lands on
+  // callback/, which posts the result back here.
+  function authorize(url) {
+    return new Promise((resolve, reject) => {
+      const popup = window.open(url, "ope-space-app-signin", "width=520,height=720");
+      if (!popup) return reject(new Error("The sign-in window was blocked. Allow pop-ups for this page and try again."));
+      function onMessage(e) {
+        if (e.origin !== ORIGIN || e.data?.ope !== "callback") return;
+        window.removeEventListener("message", onMessage);
+        clearInterval(timer);
+        resolve(e.data.params);
+      }
+      window.addEventListener("message", onMessage);
+      const timer = setInterval(() => {
+        if (popup.closed) { clearInterval(timer); window.removeEventListener("message", onMessage); resolve({ error: "the sign-in window was closed" }); }
+      }, 500);
+    });
+  }
+
+  const app = createSpaceApp({
+    source,
+    asset,
+    clientName: "Space App (OPE demo)",
+    redirectUri: `${ORIGIN}${location.pathname.replace(/[^/]*$/, "")}callback/`,
+    authorize,
+    recheckSeconds: 60,
+  });
+
+  function note(html) { log.unshift(`<span>${new Date().toLocaleTimeString()} · ${html}</span>`); log.length = Math.min(log.length, 8); }
+
+  function sourceNote() {
+    if (realSpace) {
+      $("source-note").innerHTML = `A real atproto space on Bluesky's spaces-alpha PDS, run locally: <strong>${esc(config.source.space)}</strong>. Syncing uses the chosen user's atproto session, and the space asks the License Server whether that user's subscription admits the app.${config.note ? ` ${esc(config.note)}` : ""}`;
+    } else {
+      $("source-note").innerHTML = `The space is a stand-in: the blog's <strong>subscriber-only posts</strong>.`;
+      const s = $("stand-in");
+      s.hidden = false;
+      s.innerHTML = `No atproto space can run on this hosted demo (Bluesky's spaces alpha is invite-only). So the app syncs the blog's subscriber-only posts with one connected user's License Token, the way it would sync a space with one subscriber's session. Everything after that is the same: each user's view is checked with their own token. Locally, the same app syncs a real space: <code>npm run space-app</code> in <code>ope-license-server/integration</code>.`;
+    }
+  }
+
+  function renderUsers() {
+    $("users").innerHTML = names.map((name, i) => {
+      const st = app.status(name);
+      const pill = st.state === "connected" ? `<span class="pill open">Subscribed</span>` : st.state === "locked" ? `<span class="pill locked">Locked</span>` : "";
+      const label = st.state === "connected" ? "Connected subscription" : st.state === "locked" ? (SHORT[st.reason] || st.reason) : "Not connected";
+      return `<button class="user" data-user="${esc(name)}" aria-current="${name === current}">
+        <span class="avatar" style="background:${COLORS[i % COLORS.length]}">${esc(name[0].toUpperCase())}</span>
+        <span><div class="user-name">${esc(name)}</div><div class="user-state">${esc(label)}</div></span>${pill}</button>`;
+    }).join("");
+    const choices = realSpace ? names.filter((n) => config.sessions?.[n]) : names.filter((n) => app.status(n).state === "connected");
+    const prev = $("sync-as").value;
+    $("sync-as").innerHTML = choices.length ? choices.map((n) => `<option ${n === prev ? "selected" : ""}>${esc(n)}</option>`).join("") : `<option value="">${realSpace ? "no atproto sessions" : "connect a user first"}</option>`;
+    $("sync").disabled = !choices.length;
+  }
+
+  function syncStatus() {
+    $("sync-status").innerHTML = app.syncedAt
+      ? `The app holds <strong>${app.posts.length} post${app.posts.length === 1 ? "" : "s"}</strong>, synced for ${esc(app.syncedFor)} at ${new Date(app.syncedAt).toLocaleTimeString()}.`
+      : "Nothing synced yet.";
+  }
+
+  function paragraphs(html, limit) {
+    const doc = new DOMParser().parseFromString(html || "", "text/html");
+    const ps = [...doc.querySelectorAll("p")].map((p) => p.textContent.trim()).filter(Boolean);
+    const list = ps.length ? ps : [doc.body.textContent.trim()];
+    return (limit ? list.slice(0, limit) : list).map((t) => `<p>${esc(t)}</p>`).join("");
+  }
+
+  async function renderMain({ force = false } = {}) {
+    $("viewing").textContent = `Viewing as ${current}`;
+    const st = app.status(current);
+    $("connect").hidden = st.state === "connected";
+    $("recheck").hidden = st.state !== "connected";
+    $("disconnect").hidden = st.state !== "connected";
+    const v = await app.view(current, { force });
+    renderUsers();
+    const pill = $("viewing-pill");
+    pill.className = `pill ${v.locked ? "locked" : "open"}`;
+    pill.textContent = v.locked ? "Locked" : "Can read the space";
+    let body = "";
+    if (v.locked) {
+      const why = {
+        "not connected": `${esc(current)} hasn't connected a subscription to this app.`,
+        no_entitlement: `The License Server says ${esc(current)} has no subscription, so the app didn't get a token for them.`,
+        access_denied: `${esc(current)} didn't subscribe or allow the app at the License Server, so the app has no token for them.`,
+        invalid_grant: `The License Server refused to renew ${esc(current)}'s token: the subscription has ended or the app was disconnected.`,
+      }[v.reason] || esc(v.reason);
+      body = `<div class="locked-card">
+        <h2>${esc(current)} can't read this space</h2>
+        <p>${why}</p>
+        <p>${v.count ? `The app holds <strong>${v.count} post${v.count === 1 ? "" : "s"}</strong> from the space, synced for someone else. It doesn't show them to ${esc(current)} without a License Token for ${esc(current)}.` : "Nothing has been synced yet."}</p>
+        ${st.state === "connected" ? "" : `<div class="row"><button class="btn primary" data-action="connect">Connect ${esc(current)}'s subscription</button></div>
+        <p style="font-size:0.8rem">At the License Server, sign in with any name. To subscribe, choose an Offer (a pretend checkout). To see the locked case, press Deny instead.</p>`}
+      </div>`;
+    } else if (!v.posts.length) {
+      body = `<p class="empty">${esc(current)} is subscribed, but the app hasn't synced the space yet. Choose a user under "Sync for" and press Sync.</p>`;
+    } else {
+      body = v.posts.map((p, i) => `<article class="post">
+        <h2>${esc(p.title || p.text?.slice(0, 80) || "Untitled")}</h2>
+        <div class="body" id="post-${i}">${p.html ? paragraphs(p.html, 2) : `<p>${esc(p.text)}</p>`}</div>
+        ${p.html ? `<button class="more" data-more="${i}">Read the whole post</button>` : ""}
+      </article>`).join("");
+    }
+    $("content").innerHTML = body + (log.length ? `<div class="log"><b>What the app did</b>${log.join("")}</div>` : "");
+  }
+
+  async function busy(button, fn) {
+    button.disabled = true;
+    try { await fn(); } catch (e) { note(`<span class="err">${esc(e.message)}</span>`); } finally { button.disabled = false; await renderMain(); }
+  }
+
+  async function doConnect(button) {
+    await busy(button, async () => {
+      note(`Sending ${esc(current)} to the License Server to connect a subscription…`);
+      const r = await app.connect(current);
+      note(r.connected ? `${esc(current)} connected: the app now holds a License Token for them.` : `${esc(current)} didn't connect: <b>${esc(r.reason)}</b>.`);
+    });
+  }
+
+  $("connect").addEventListener("click", (e) => doConnect(e.currentTarget));
+  $("recheck").addEventListener("click", (e) => busy(e.currentTarget, async () => {
+    const v = await app.view(current, { force: true });
+    note(v.locked ? `Re-checked ${esc(current)}: <b>${esc(v.reason)}</b>.` : `Re-checked ${esc(current)} by renewing their token: still subscribed.`);
+  }));
+  $("disconnect").addEventListener("click", (e) => busy(e.currentTarget, async () => {
+    await app.disconnect(current);
+    note(`Disconnected ${esc(current)} and revoked their authorization at the License Server.`);
+  }));
+  $("sync").addEventListener("click", (e) => busy(e.currentTarget, async () => {
+    const who = $("sync-as").value;
+    note(`Syncing for ${esc(who)}…`);
+    try {
+      const r = realSpace ? await app.sync(config.sessions[who], who) : await app.sync(who);
+      note(`Synced ${r.posts} posts for ${esc(who)}. Every user's view now draws on this copy.`);
+    } catch (err) {
+      const why = err.xrpc === "SpaceNotFound"
+        ? `the space's host asked the License Server, which said ${esc(who)} has no subscription`
+        : err.status === 401 || err.status === 403 || err.status === 402
+          ? `the publisher refused ${esc(who)}'s token`
+          : esc(err.message);
+      note(`<span class="err">The sync for ${esc(who)} was refused: ${why}.</span>`);
+    }
+    syncStatus();
+  }));
+  $("users").addEventListener("click", (e) => {
+    const b = e.target.closest("[data-user]");
+    if (!b) return;
+    current = b.dataset.user;
+    renderMain();
+  });
+  $("content").addEventListener("click", (e) => {
+    const more = e.target.closest("[data-more]");
+    if (more) { const i = Number(more.dataset.more); $(`post-${i}`).innerHTML = paragraphs(app.posts[i].html); more.remove(); }
+    const act = e.target.closest("[data-action=connect]");
+    if (act) doConnect(act);
+  });
+  $("add-user").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const name = $("new-user").value.trim();
+    if (name && !names.includes(name)) { names = [...names, name]; current = name; }
+    $("new-user").value = "";
+    renderMain();
+  });
+
+  sourceNote();
+  syncStatus();
+  renderMain();
+</script>
+</body>
+</html>

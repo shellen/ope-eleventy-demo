@@ -560,7 +560,9 @@ app.get("/authorize", async (req, res) => {
     resolved,
     expires: Date.now() + 10 * 60 * 1000,
   });
-  const account = sessionAccount(req);
+  // prompt=login (OpenID Connect Core §3.1.2.1): sign in again even with a session, so an
+  // app that serves several people on one device gets each person's own account.
+  const account = q.prompt === "login" ? null : sessionAccount(req);
   if (!account) return res.send(loginPage(id));
   proceed(transactions.get(id), account, res);
 });
