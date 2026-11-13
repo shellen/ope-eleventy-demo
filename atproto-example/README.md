@@ -32,12 +32,19 @@ atproto spaces are in alpha (proposal 0016, alpha since August 20, 2026), with b
   4. The app reads the posts, signing each request with the credential's key (RFC 9421).
 
   Unsubscribed, cancelled, and unlinked readers are refused, and so is a request signed with the wrong key.
+- **A multi-user app that checks each user** ([`atproto-example/space-app.mjs`](./space-app.mjs), tested in `ope-license-server/integration/space-app.test.js`). Under the proposal, a space credential admits an *app*, not each reader. So the app syncs the space once, using one subscriber's session, and then checks each of its users separately. It shows a user the posts only while it holds a License Token for that user covering the space's Asset, and refreshes the token to re-check. Against the alpha PDS, with the real License Server:
+  - a subscriber sees the posts;
+  - another user of the same app, with no subscription, doesn't, though the app holds the posts;
+  - a user who subscribes from the app sees them without ever linking an atproto account;
+  - when a subscriber cancels, their view locks at the next check, and the app can no longer sync with their session.
+
+  The app needs no dependencies: fetch and WebCrypto, including the RFC 9421 request signatures, which Bluesky's PDS accepts.
 
 **Doesn't yet:**
 - **A hosted space.** The alpha server is invite-only.
 - **Live access.** The live License Server manages no space until `OPE_MANAGED_SPACES` is set.
-- **A reader app for spaces.** The test plays the app.
-- **Per-user checks inside apps.** A space credential lets an *app* sync the space; it doesn't say which of the app's users may see it. Under the proposal, an app serving many users decides that itself. For a paid space, OPE gives it a way: check each user's entitlement, for example with an OPE License Token for the space's Asset.
+- **A reader app for spaces.** `space-app.mjs` is a library the test drives; there's no page to open.
+- **Which Asset a space stands for is configuration**, given to both the License Server and the app.
 - **Early cancellation.** Only the space's authority (the publisher's PDS) can revoke a credential before it expires. So a cancellation stops new credentials at once, and a credential already issued lasts its lifetime: 10 minutes by default.
 - **A stable API.**
 
