@@ -4,7 +4,8 @@
   "type": "module",
   "description": "Integration test: the License Server as managing app for a space on Bluesky's own spaces-alpha PDS (in-process dev network).",
   "scripts": {
-    "test": "node --test spaces.test.js"
+    "test": "node --test --test-concurrency=1 spaces.test.js space-app.test.js",
+    "space-app": "node space-app-server.mjs"
   },
   "dependencies": {
     "@atproto/dev-env": "0.0.0-spaces-alpha-20261112204144"

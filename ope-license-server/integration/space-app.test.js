@@ -18,7 +18,7 @@ import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { TestNetworkNoAppView } from "@atproto/dev-env";
 import express from "express";
-import { createSpaceApp } from "../../atproto-example/space-app.mjs";
+import { createSpaceApp, atprotoSpaceSource } from "../../atproto-example/space-app.mjs";
 import { autoAuthorize } from "../../ope-reader/auto-consent.js";
 
 const LS_PORT = 4394;
@@ -108,10 +108,8 @@ before(async () => {
   // what that user would choose).
   const choices = { ada: "approve", bobby: "approve", carol: "offer:monthly" };
   app = createSpaceApp({
-    space,
-    spaceHost: pds.url,
+    source: atprotoSpaceSource({ space, spaceHost: pds.url, collection: POSTS }),
     asset: SCOPE,
-    collection: POSTS,
     clientName: "A multi-user atproto app",
     redirectUri: "http://127.0.0.1:4396/callback",
     authorize: (url, user) => autoAuthorize(url, { account: user, choose: choices[user] }),

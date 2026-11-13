@@ -2,7 +2,7 @@
 
 A single page, with no build step and no dependencies, showing how a publisher on the AT Protocol could keep subscriber-only posts in an **atproto space**, with an **OPE License Server** deciding who may read them. The decision comes from the same subscription that unlocks the publisher's site and every OPE app.
 
-Open `index.html` in a browser, or see it on the demo blog at `/atproto/`.
+Open `index.html` in a browser, or see it on the demo blog at `/atproto/`. The space app (`space-app/index.html`, with `space-app.mjs`) is on the blog at `/space-app/`.
 
 ## What it shows
 
@@ -39,11 +39,17 @@ atproto spaces are in alpha (proposal 0016, alpha since August 20, 2026), with b
   - when a subscriber cancels, their view locks at the next check, and the app can no longer sync with their session.
 
   The app needs no dependencies: fetch and WebCrypto, including the RFC 9421 request signatures, which Bluesky's PDS accepts.
+- **The space app, open on the blog** at [`/space-app/`](https://ope-demo.jason-e0e.workers.dev/space-app/). It is one page playing the app's server and its users (Ada, Bobby, Carol, or any you add):
+  - connect each user's subscription at the License Server;
+  - sync once for one subscriber;
+  - switch users to see who the app shows the posts to.
+
+  On the hosted blog the space is a labeled stand-in: no atproto space can run there, so the app syncs the blog's subscriber-only posts with one subscriber's License Token. Each user's view is still checked with their own token. Locally, `npm run space-app` in `../ope-license-server/integration` serves the same page against a real space on Bluesky's alpha PDS. There, syncing is refused until the chosen user subscribes, because the License Server, as managing app, says no.
 
 **Doesn't yet:**
 - **A hosted space.** The alpha server is invite-only.
 - **Live access.** The live License Server manages no space until `OPE_MANAGED_SPACES` is set.
-- **A reader app for spaces.** `space-app.mjs` is a library the test drives; there's no page to open.
+- **A real space on the hosted blog.** The live space app syncs a stand-in; only local runs sync a real space.
 - **Which Asset a space stands for is configuration**, given to both the License Server and the app.
 - **Early cancellation.** Only the space's authority (the publisher's PDS) can revoke a credential before it expires. So a cancellation stops new credentials at once, and a credential already issued lasts its lifetime: 10 minutes by default.
 - **A stable API.**

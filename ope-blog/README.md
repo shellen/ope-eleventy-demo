@@ -37,6 +37,7 @@ The build writes:
 | `/terms/` | The Terms. Tokens carry its SHA-256 digest |
 | `/reader/` | The browser reader from `../ope-reader`, as static files |
 | `/atproto/` | The OPE and atproto spaces page from `../atproto-example` |
+| `/space-app/` | The multi-user space app from `../atproto-example/space-app/`, with its module at `/atproto-example/space-app.mjs` and the reader's client at `/ope-reader/ope-client.js` |
 
 ## Subscribing and reading on the blog
 

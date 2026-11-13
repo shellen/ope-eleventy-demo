@@ -9,9 +9,12 @@
 //
 // So this app does two separate things:
 //
-//   sync(session)   Ask the space host for a credential, acting for one user (whose
-//                   subscription, via the License Server as managing app, admits the app),
-//                   then read every writer's posts in the space. Done once for everyone.
+//   sync(session)   Read the posts once, for everyone, acting for one user. From a real
+//                   space (atprotoSpaceSource): ask the space host for a credential with
+//                   that user's atproto session; their subscription, via the License
+//                   Server as managing app, admits the app. On the hosted demo, where no
+//                   space can run, a stand-in (blogStandInSource) reads the blog's
+//                   subscriber-only posts with that user's License Token instead.
 //
 //   view(user)      Show a user the posts only while the app holds a current License
 //                   Token for *that* user, covering the space's Asset. Each user connects
@@ -80,30 +83,93 @@ async function xrpc(base, method, { params, body, headers = {} } = {}) {
   return data;
 }
 
+// ── Where the app's posts come from ─────────────────────────────────
+
+// A real atproto space. sync() is given one user's atproto session ({ pds, accessJwt }):
+// a delegation token from that user's own PDS, exchanged at the space host for a
+// credential bound to a fresh key, then every writer's posts.
+export function atprotoSpaceSource({ space, spaceHost, collection }) {
+  return {
+    kind: "atproto-space",
+    async fetch(session) {
+      const { token: delegationToken } = await xrpc(session.pds, "com.atproto.space.getDelegationToken", {
+        params: { space }, headers: { authorization: `Bearer ${session.accessJwt}` },
+      });
+      const key = await generateCredentialKey();
+      const { credential } = await xrpc(spaceHost, "com.atproto.space.authorizeSpaceSync", {
+        body: { space, credentialKey: key.did, delegationToken },
+      });
+      const authority = /^at:\/\/([^/]+)\//.exec(space)[1];
+      // The writer set: every repo that holds data in the space, asked of the space host
+      // (so the signature is addressed to the authority). Removed writers are skipped.
+      const { repos: entries = [] } = await xrpc(spaceHost, "com.atproto.space.listWriters", {
+        params: { space }, headers: await spaceCredentialHeaders(key, credential, authority),
+      });
+      const repos = entries.filter((e) => !String(e.$type || "").endsWith("#repoRemoved")).map((e) => e.repo);
+      const posts = [];
+      for (const repo of repos) {
+        // Each repo is read from its own host with a signature addressed to its owner.
+        // (In this demo every account is on the space host.)
+        const { records = [] } = await xrpc(spaceHost, "com.atproto.space.listRecords", {
+          params: { space, repo, collection }, headers: await spaceCredentialHeaders(key, credential, repo),
+        });
+        posts.push(...records.map((r) => ({ repo, rkey: r.rkey, title: r.value.title, text: r.value.text, ...r.value })));
+      }
+      return { posts, repos: repos.length };
+    },
+  };
+}
+
+// A stand-in for a space, for the hosted demo, where no atproto space can run: the
+// blog's subscriber-only posts. sync() is given one of the app's connected users, and
+// fetches each gated post with that user's License Token, the way an atproto app syncs a
+// space with one subscriber's session. The app then shows them only to users with
+// their own token, exactly as it would a space's posts.
+export function blogStandInSource({ feedUrl }) {
+  return {
+    kind: "blog-stand-in",
+    async fetch(user, app) {
+      const feed = await (await fetch(feedUrl, { credentials: "omit" })).json();
+      const gated = (feed.items || []).filter((item) => item._ope);
+      const posts = [];
+      for (const item of gated) {
+        const res = await app.fetchAs(user, item.url);
+        if (!res.ok) {
+          const err = new Error(`the publisher refused ${user}'s token (${res.status})`);
+          err.status = res.status;
+          throw err;
+        }
+        posts.push({ title: res.body.title || item.title, url: item.url, html: res.body.content_html });
+      }
+      return { posts, repos: 1 };
+    },
+  };
+}
+
 // ── The app ─────────────────────────────────────────────────────────
 
 // options:
-//   space        the space's at:// reference
-//   spaceHost    the space host's URL (the authority's PDS)
+//   source       where posts come from: atprotoSpaceSource(...) or blogStandInSource(...)
 //   asset        the OPE Asset the space stands for (a scope, like https://blog.example/posts/)
-//   collection   the record type to read (posts)
 //   clientName, redirectUri   how the app registers with the License Server
 //   authorize(url, user)      sends `user` through the License Server's authorization
 //                             page and returns the redirect's query ({ code } or { error })
 //   recheckSeconds            how stale a user's check may get (default 300)
 export function createSpaceApp(options) {
-  const { space, spaceHost, asset, collection, clientName = "OPE space app", redirectUri, authorize } = options;
+  const { source, asset, clientName = "OPE space app", redirectUri, authorize } = options;
   const recheckSeconds = options.recheckSeconds ?? 300;
-  const ope = createClient();
+  // Requests to the publisher never carry cookies: the blog's own access cookie must not
+  // stand in for a user's token.
+  const ope = createClient({ fetchPublisher: (url, init) => fetch(url, { ...init, credentials: "omit" }) });
   const users = new Map(); // app user → { tokens, dpopKey, checkedAt } or { locked }
   let authServer = null, clientId = null;
   let posts = [];
-  let syncedAt = null;
+  let syncedAt = null, syncedFor = null;
 
   // The License Server for the space's Asset, from the Asset's own metadata (RFC 9728).
   async function licenseServer() {
     if (authServer) return authServer;
-    const doc = await (await fetch(metadataUrl(asset))).json();
+    const doc = await (await fetch(metadataUrl(asset), { credentials: "omit" })).json();
     if (doc.resource !== asset || !doc.ope) throw new Error("no OPE metadata for the space's Asset");
     const issuer = doc.authorization_servers[0];
     const meta = await (await fetch(`${issuer}/.well-known/oauth-authorization-server`)).json();
@@ -113,35 +179,14 @@ export function createSpaceApp(options) {
     return authServer;
   }
 
-  // Sync the space for everyone, acting for one user: a delegation token from that user's
-  // own PDS, exchanged at the space host for a credential bound to a fresh key.
-  async function sync(session) {
-    const { token: delegationToken } = await xrpc(session.pds, "com.atproto.space.getDelegationToken", {
-      params: { space }, headers: { authorization: `Bearer ${session.accessJwt}` },
-    });
-    const key = await generateCredentialKey();
-    const { credential } = await xrpc(spaceHost, "com.atproto.space.authorizeSpaceSync", {
-      body: { space, credentialKey: key.did, delegationToken },
-    });
-    const authority = /^at:\/\/([^/]+)\//.exec(space)[1];
-    // The writer set: every repo that holds data in the space, asked of the space host
-    // (so the signature is addressed to the authority). Removed writers are skipped.
-    const { repos: entries = [] } = await xrpc(spaceHost, "com.atproto.space.listWriters", {
-      params: { space }, headers: await spaceCredentialHeaders(key, credential, authority),
-    });
-    const repos = entries.filter((e) => !String(e.$type || "").endsWith("#repoRemoved")).map((e) => e.repo);
-    const next = [];
-    for (const repo of repos) {
-      // Each repo is read from its own host with a signature addressed to its owner.
-      // (In this demo every account is on the space host.)
-      const { records = [] } = await xrpc(spaceHost, "com.atproto.space.listRecords", {
-        params: { space, repo, collection }, headers: await spaceCredentialHeaders(key, credential, repo),
-      });
-      next.push(...records.map((r) => ({ repo, rkey: r.rkey, ...r.value })));
-    }
-    posts = next;
+  // Sync for everyone, acting for one user (see the sources above). Done once; every
+  // user's view then draws on the same copy.
+  async function sync(session, label) {
+    const result = await source.fetch(session, api);
+    posts = result.posts;
     syncedAt = new Date().toISOString();
-    return { posts: posts.length, repos: repos.length };
+    syncedFor = label ?? (typeof session === "string" ? session : null);
+    return { posts: posts.length, repos: result.repos };
   }
 
   // A user connects their own OPE subscription: Authorization Code + PKCE + DPoP for the
@@ -150,7 +195,9 @@ export function createSpaceApp(options) {
     const as = await licenseServer();
     const { verifier, challenge } = await pkce();
     const state = crypto.randomUUID();
-    const url = ope.authorizationUrl(as, { clientId, redirectUri, resource: asset, codeChallenge: challenge, state });
+    // prompt=login: each of the app's users signs in as themselves, even on a shared
+    // browser that's already signed in at the License Server as someone else.
+    const url = `${ope.authorizationUrl(as, { clientId, redirectUri, resource: asset, codeChallenge: challenge, state })}&prompt=login`;
     const back = await authorize(url, user);
     if (back.error || back.state !== state || back.iss !== as.issuer) {
       const reason = back.error || "the authorization response didn't match";
@@ -172,12 +219,12 @@ export function createSpaceApp(options) {
   // Is this user entitled right now? Refresh the token when the last check is older than
   // recheckSeconds or the token has expired; the License Server refuses once the
   // subscription has ended (it revokes the grant), and the user's view locks.
-  async function check(user) {
+  async function check(user, { force = false } = {}) {
     const entry = users.get(user);
     if (!entry) return { ok: false, reason: "not connected" };
     if (entry.locked) return { ok: false, reason: entry.locked };
     const ageSeconds = (Date.now() - entry.checkedAt) / 1000;
-    if (ageSeconds >= recheckSeconds || ageSeconds >= (entry.tokens.expires_in ?? 0)) {
+    if (force || ageSeconds >= recheckSeconds || ageSeconds >= (entry.tokens.expires_in ?? 0)) {
       try {
         const tokens = await ope.refresh(await licenseServer(), { clientId, refreshToken: entry.tokens.refresh_token }, entry.dpopKey);
         if (!covers(tokens.resource ?? entry.tokens.resource)) throw new Error("the token no longer covers the space's Asset");
@@ -187,13 +234,29 @@ export function createSpaceApp(options) {
         return { ok: false, reason: e.oauth?.error || e.message };
       }
     }
-    return { ok: true };
+    return { ok: true, checkedAt: entry.checkedAt };
   }
 
-  // What this user sees: the space's posts, or a locked view saying why.
-  async function view(user) {
+  // Fetch a publisher URL with a user's License Token (spec §11.1), after checking it.
+  async function fetchAs(user, url) {
     const verdict = await check(user);
+    if (!verdict.ok) return { ok: false, status: 0, reason: verdict.reason };
+    const entry = users.get(user);
+    return ope.fetchAsset(url, entry.tokens, entry.dpopKey);
+  }
+
+  // What this user sees: the synced posts, or a locked view saying why.
+  async function view(user, opts) {
+    const verdict = await check(user, opts);
     return verdict.ok ? { locked: false, posts, syncedAt } : { locked: true, reason: verdict.reason, count: posts.length };
+  }
+
+  // Where a user stands, without contacting anyone.
+  function status(user) {
+    const entry = users.get(user);
+    if (!entry) return { state: "not connected" };
+    if (entry.locked) return { state: "locked", reason: entry.locked };
+    return { state: "connected", checkedAt: entry.checkedAt, expiresIn: entry.tokens.expires_in };
   }
 
   // Forget a user's connection (and end it at the License Server, spec §12.2).
@@ -203,5 +266,11 @@ export function createSpaceApp(options) {
     if (entry?.tokens?.refresh_token) await ope.revoke(await licenseServer(), { clientId, token: entry.tokens.refresh_token });
   }
 
-  return { sync, connect, view, disconnect, get posts() { return posts; } };
+  const api = {
+    sync, connect, view, check, status, disconnect, fetchAs, licenseServer,
+    get posts() { return posts; },
+    get syncedAt() { return syncedAt; },
+    get syncedFor() { return syncedFor; },
+  };
+  return api;
 }

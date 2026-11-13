@@ -355,6 +355,15 @@ describe("Web profile: unlocking on the blog itself", () => {
     assert.equal((await go(authorize.headers.get("location"))).status, 303);
   });
 
+  it("asks the reader to sign in again when the app sends prompt=login", async () => {
+    // An app serving several people on one device (the space app) needs each person's
+    // own account, even when the browser is already signed in as someone else.
+    const start = await go(`${SITE}/_ope/unlock?post=${encodeURIComponent("/posts/005-podcast-open-feeds/")}`);
+    const authorize = await go(`${start.headers.get("location")}&prompt=login`);
+    assert.equal(authorize.status, 200, "a sign-in page, not a redirect");
+    assert.match(await authorize.text(), /action="\/login"/);
+  });
+
   it("refuses a callback whose signed cookie was tampered with", async () => {
     const start = await go(`${SITE}/_ope/unlock?post=${encodeURIComponent("/posts/002-protocol-economics/")}`);
     const authorize = await go(start.headers.get("location"));
